@@ -1,0 +1,41 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 인쇄용 CSS */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+
+  body {
+    margin: 0;
+    font-size: 12pt;
+    line-height: 1.4;
+  }
+
+  @page {
+    margin: 2cm;
+  }
+
+  h1, h2, h3 {
+    break-after: avoid;
+  }
+
+  .print-signature {
+    break-inside: avoid;
+  }
+}
+
+/* 터치 디바이스 최적화 */
+@media (hover: none) {
+  button:hover {
+    background-color: initial;
+  }
+}
+
+/* 서명 캔버스 스타일 */
+.signature-canvas {
+  touch-action: none;
+  user-select: none;
+}
