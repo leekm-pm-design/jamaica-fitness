@@ -195,6 +195,16 @@ export default function PDFContractForm() {
       agreedTerms: false,
     });
     setStep(1);
+    setActiveDocument('terms'); // 회원약관부터 시작
+    setMessage(null);
+
+    // 서명 데이터 초기화
+    setApplicationPageSignatures(new Map());
+    setTermsPageSignatures(new Map());
+    setApplicationCurrentPage(1);
+    setTermsCurrentPage(1);
+
+    console.log('폼 및 서명 데이터 완전 초기화됨');
   };
 
   const handleBackToForm = () => {
