@@ -274,38 +274,49 @@ export default function PDFSignaturePad({
     setIsSaving(false);
   };
 
-  // 페이지 변경 시 서명 저장/불러오기
+  // 페이지 변경 시 서명 불러오기
   useEffect(() => {
     if (!signaturePad || !currentPage) return;
 
-    console.log(`[${documentType}] 페이지 서명 상태 업데이트:`, currentPage);
+    console.log(`[${documentType}] 페이지 ${currentPage}로 전환 - 서명 로드 시도`);
 
-    // 해당 페이지에 저장된 서명이 있으면 불러오기
-    const savedSignature = pageSignatures.get(currentPage);
-    if (savedSignature) {
-      signaturePad.fromData(savedSignature);
-      console.log(`[${documentType}] 페이지 ${currentPage}의 저장된 서명 불러옴`);
-    } else {
-      signaturePad.clear();
-      console.log(`[${documentType}] 페이지 ${currentPage}는 서명 없음`);
-    }
+    // 약간의 지연을 두어 state 업데이트가 완료되도록 함
+    const timer = setTimeout(() => {
+      const savedSignature = pageSignatures.get(currentPage);
+      if (savedSignature && savedSignature.length > 0) {
+        console.log(`[${documentType}] 페이지 ${currentPage}의 저장된 서명 불러옴 (${savedSignature.length}개 포인트)`);
+        signaturePad.clear();
+        signaturePad.fromData(savedSignature);
+      } else {
+        console.log(`[${documentType}] 페이지 ${currentPage}는 서명 없음 - 캔버스 초기화`);
+        signaturePad.clear();
+      }
+    }, 50);
+
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, signaturePad, documentType]);
-  // pageSignatures를 제거하여 서명 저장 시 무한 루프 방지
+  // pageSignatures는 의도적으로 제외하여 무한 루프 방지
 
 
   const handlePageChange = (newPage: number) => {
     console.log(`[${documentType}] 페이지 변경 요청:`, { currentPage, newPage, totalPages });
     if (newPage >= 1 && newPage <= totalPages) {
-      // 현재 페이지의 서명을 저장
+      // 현재 페이지의 서명을 먼저 저장 (비어있지 않으면)
+      const newMap = new Map(pageSignatures);
+
       if (signaturePad && !signaturePad.isEmpty()) {
         const signatureData = signaturePad.toData();
-        const newMap = new Map(pageSignatures);
         newMap.set(currentPage, signatureData);
-        onPageSignaturesChange(newMap);
-        console.log(`[${documentType}] 페이지 ${currentPage}의 서명 저장됨`);
+        console.log(`[${documentType}] 페이지 ${currentPage}의 서명 저장됨 (${signatureData.length}개 포인트)`);
+      } else {
+        console.log(`[${documentType}] 페이지 ${currentPage}는 비어있음 - 저장 안 함`);
       }
 
+      // state 업데이트
+      onPageSignaturesChange(newMap);
+
+      // 페이지 변경
       onCurrentPageChange(newPage);
       console.log(`[${documentType}] 페이지 변경됨:`, newPage);
     } else {
