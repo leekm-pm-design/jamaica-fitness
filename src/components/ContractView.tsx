@@ -121,6 +121,31 @@ export default function ContractView({ contractId }: Props) {
   const imagePrefix = activeDocument === 'application' ? '입회신청서' : '회원약관';
   const totalPages = DOCUMENT_CONFIG[activeDocument].totalPages;
 
+  // 전체 페이지 렌더링 (프린트용)
+  const renderAllPages = (docType: DocumentType) => {
+    const prefix = docType === 'application' ? '입회신청서' : '회원약관';
+    const pages = DOCUMENT_CONFIG[docType].totalPages;
+    const pageElements = [];
+
+    for (let page = 1; page <= pages; page++) {
+      // 입회신청서 6페이지에 서명이 있으면 서명된 이미지 사용
+      const isSignedPage = docType === 'application' && page === 6 && contract.signatureData;
+
+      pageElements.push(
+        <div key={`${docType}-${page}`} className="print-page">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={isSignedPage ? contract.signatureData : `/img/${prefix}_페이지_${page}.jpg`}
+            alt={`${prefix} ${page}페이지`}
+            className="w-full h-auto"
+          />
+        </div>
+      );
+    }
+
+    return pageElements;
+  };
+
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
       {/* 상단 헤더 - 인쇄 시 숨김 */}
@@ -147,7 +172,7 @@ export default function ContractView({ contractId }: Props) {
                 onClick={handlePrint}
                 className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
               >
-                인쇄
+                전체 인쇄
               </button>
             </div>
           </div>
@@ -162,7 +187,7 @@ export default function ContractView({ contractId }: Props) {
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              입회신청서 (6페이지)
+              입회신청서 (6페이지) {contract.signatureData && '✓'}
             </button>
             <button
               onClick={() => setActiveDocument('terms')}
@@ -178,9 +203,9 @@ export default function ContractView({ contractId }: Props) {
         </div>
       </div>
 
-      {/* 문서 이미지 뷰어 */}
-      <div className="flex-1 bg-gray-200 flex items-center justify-center p-4 print:p-0 print:bg-white">
-        <div className="max-w-4xl w-full bg-white shadow-lg rounded-lg overflow-hidden print:shadow-none print:rounded-none print:max-w-none">
+      {/* 화면 뷰어 - 한 페이지씩 보기 (인쇄 시 숨김) */}
+      <div className="no-print flex-1 bg-gray-200 flex items-center justify-center p-4">
+        <div className="max-w-4xl w-full bg-white shadow-lg rounded-lg overflow-hidden">
           {/* 페이지 이미지 */}
           <div className="relative bg-white">
             {/* 입회신청서 마지막 페이지이고 서명 데이터가 있으면 서명된 이미지 표시, 아니면 원본 */}
@@ -190,9 +215,9 @@ export default function ContractView({ contractId }: Props) {
                 <img
                   src={contract.signatureData}
                   alt={`${DOCUMENT_CONFIG[activeDocument].title} ${currentPage}페이지 (서명됨)`}
-                  className="w-full h-auto print:max-w-full"
+                  className="w-full h-auto"
                 />
-                <div className="no-print absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded shadow-lg">
+                <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded shadow-lg">
                   ✓ 서명완료
                 </div>
               </>
@@ -201,13 +226,13 @@ export default function ContractView({ contractId }: Props) {
               <img
                 src={`/img/${imagePrefix}_페이지_${currentPage}.jpg`}
                 alt={`${DOCUMENT_CONFIG[activeDocument].title} ${currentPage}페이지`}
-                className="w-full h-auto print:max-w-full"
+                className="w-full h-auto"
               />
             )}
           </div>
 
-          {/* 페이지 네비게이션 - 인쇄 시 숨김 */}
-          <div className="no-print bg-gray-50 border-t p-3">
+          {/* 페이지 네비게이션 */}
+          <div className="bg-gray-50 border-t p-3">
             <div className="flex items-center justify-between gap-2">
               <button
                 onClick={() => handlePageChange(currentPage - 1)}
@@ -238,17 +263,38 @@ export default function ContractView({ contractId }: Props) {
         </div>
       </div>
 
+      {/* 프린트용 - 모든 페이지 출력 */}
+      <div className="print-only">
+        <div className="print-section">
+          <h2 className="text-center text-xl font-bold mb-4">입회신청서</h2>
+          {renderAllPages('application')}
+        </div>
+        <div className="print-section page-break">
+          <h2 className="text-center text-xl font-bold mb-4">회원약관</h2>
+          {renderAllPages('terms')}
+        </div>
+      </div>
+
       {/* 인쇄용 CSS */}
       <style jsx global>{`
+        /* 화면에서는 프린트용 숨김 */
+        .print-only {
+          display: none;
+        }
+
         @media print {
-          /* 인쇄 시 헤더, 버튼, 배경 등 숨기기 */
+          /* 인쇄 시 화면 뷰어 숨기고 프린트용만 표시 */
           .no-print {
             display: none !important;
           }
 
-          /* 페이지 여백 최소화 */
+          .print-only {
+            display: block !important;
+          }
+
+          /* 페이지 설정 */
           @page {
-            margin: 0;
+            margin: 10mm;
             size: A4;
           }
 
@@ -258,14 +304,35 @@ export default function ContractView({ contractId }: Props) {
             background: white !important;
           }
 
-          /* 문서 이미지만 표시 */
-          img {
+          /* 섹션 간 페이지 나누기 */
+          .page-break {
+            page-break-before: always;
+          }
+
+          /* 각 페이지가 새 페이지에서 시작 */
+          .print-page {
+            page-break-after: always;
+            page-break-inside: avoid;
+          }
+
+          .print-page:last-child {
+            page-break-after: auto;
+          }
+
+          /* 이미지 최적화 */
+          .print-page img {
             display: block;
             width: 100% !important;
             max-width: 100% !important;
             height: auto !important;
-            page-break-after: auto;
-            page-break-inside: avoid;
+            margin: 0 auto;
+          }
+
+          /* 섹션 제목 */
+          .print-section h2 {
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #333;
           }
         }
       `}</style>
