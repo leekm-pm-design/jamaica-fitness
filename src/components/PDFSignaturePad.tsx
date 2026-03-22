@@ -257,9 +257,8 @@ export default function PDFSignaturePad({
       return;
     }
 
-    // 흰 배경 (배경 이미지 제외하고 흰 배경만)
-    ctx.fillStyle = 'white';
-    ctx.fillRect(0, 0, mergedCanvas.width, mergedCanvas.height);
+    // 투명 배경 (배경 이미지는 ContractView에서 별도로 렌더링)
+    // 서명만 그려서 오버레이 방식으로 표시
 
     // 각 페이지의 서명만 그리기 (배경 이미지 제외)
     for (let page = 1; page <= totalPages; page++) {
