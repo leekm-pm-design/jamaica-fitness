@@ -400,7 +400,6 @@ export default function ContractView({ contractId }: Props) {
             top: 0;
             left: 0;
             width: 100%;
-            height: 100%;
             pointer-events: none;
           }
 
@@ -410,6 +409,7 @@ export default function ContractView({ contractId }: Props) {
             max-width: 100% !important;
             height: auto !important;
             margin: 0 auto;
+            opacity: 1;
           }
 
           /* 이미지 최적화 */
@@ -436,7 +436,6 @@ export default function ContractView({ contractId }: Props) {
           top: 0;
           left: 0;
           width: 100%;
-          height: 100%;
           pointer-events: none;
         }
 
@@ -444,6 +443,7 @@ export default function ContractView({ contractId }: Props) {
           display: block;
           width: 100%;
           height: auto;
+          opacity: 1;
         }
       `}</style>
     </div>
