@@ -131,9 +131,19 @@ export default function ContractView({ contractId }: Props) {
     const signedDataString = docType === 'application' ? contract.signatureData : contract.termsSignatureData;
 
     if (signedDataString) {
+      console.log(`[ContractView] ${prefix} 서명 데이터 확인:`, {
+        dataLength: signedDataString.length,
+        dataSizeKB: Math.round(signedDataString.length / 1024),
+        isJSON: signedDataString.startsWith('{')
+      });
+
       try {
         // JSON 파싱하여 페이지별 이미지 추출
         const pageDataMap = JSON.parse(signedDataString);
+        console.log(`[ContractView] ${prefix} JSON 파싱 성공:`, {
+          totalPages: Object.keys(pageDataMap).length,
+          pages: Object.keys(pageDataMap)
+        });
         const pageElements = [];
 
         for (let page = 1; page <= pages; page++) {
@@ -257,9 +267,14 @@ export default function ContractView({ contractId }: Props) {
                 : contract.termsSignatureData;
 
               if (signedDataString) {
+                console.log(`[ContractView Screen] ${DOCUMENT_CONFIG[activeDocument].title} 페이지 ${currentPage} 로드 시도`);
                 try {
                   const pageDataMap = JSON.parse(signedDataString);
                   const currentPageImage = pageDataMap[currentPage];
+                  console.log(`[ContractView Screen] 페이지 ${currentPage} 데이터:`, {
+                    exists: !!currentPageImage,
+                    imageSize: currentPageImage ? Math.round(currentPageImage.length / 1024) + 'KB' : 'N/A'
+                  });
 
                   if (currentPageImage) {
                     return (

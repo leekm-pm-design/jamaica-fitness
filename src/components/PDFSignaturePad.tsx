@@ -291,11 +291,19 @@ export default function PDFSignaturePad({
 
     // 4. JSON으로 변환하여 저장
     const signatureData = JSON.stringify(pageDataMap);
+    const dataSizeKB = Math.round(signatureData.length / 1024);
+    const dataSizeMB = (signatureData.length / (1024 * 1024)).toFixed(2);
 
     console.log(`[${documentType}] 서명 완료 (배경+서명 합성):`, {
       totalSignedPages: pageSignatures.size,
-      signatureDataSize: Math.round(signatureData.length / 1024) + 'KB'
+      signatureDataSize: `${dataSizeKB}KB (${dataSizeMB}MB)`,
+      totalPages: Object.keys(pageDataMap).length
     });
+
+    if (signatureData.length > 4 * 1024 * 1024) {
+      console.error(`⚠️ 데이터가 너무 큽니다! (${dataSizeMB}MB) - 4.5MB 제한 초과 가능`);
+      alert(`경고: 데이터 크기가 ${dataSizeMB}MB입니다. 저장에 실패할 수 있습니다.`);
+    }
 
     onSignatureComplete(signatureData, pdfArrayBuffer);
     setIsSaving(false);
