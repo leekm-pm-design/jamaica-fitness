@@ -38,6 +38,12 @@ export async function POST(req: NextRequest) {
   try {
     const { password } = await req.json();
 
+    console.log('=== 로그인 디버깅 ===');
+    console.log('입력된 비밀번호:', password);
+    console.log('환경변수 ADMIN_PASSWORD:', process.env.ADMIN_PASSWORD);
+    console.log('비밀번호 길이:', password?.length);
+    console.log('환경변수 길이:', process.env.ADMIN_PASSWORD?.length);
+
     if (!password) {
       return NextResponse.json(
         { success: false, message: '비밀번호를 입력해주세요' },
@@ -46,11 +52,14 @@ export async function POST(req: NextRequest) {
     }
 
     if (!verifyPassword(password)) {
+      console.log('비밀번호 검증 실패');
       return NextResponse.json(
         { success: false, message: '비밀번호가 일치하지 않습니다' },
         { status: 401 }
       );
     }
+
+    console.log('비밀번호 검증 성공');
 
     // 인증 성공 시 쿠키 설정
     const cookieStore = await cookies();
