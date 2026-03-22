@@ -31,7 +31,6 @@ export default function PDFSignaturePad({
 }: PDFSignaturePadProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const imageRef = useRef<HTMLImageElement | null>(null);
   const [signaturePad, setSignaturePad] = useState<SignaturePad | null>(null);
   const [pdfArrayBuffer, setPdfArrayBuffer] = useState<ArrayBuffer | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -71,34 +70,6 @@ export default function PDFSignaturePad({
   // 고정된 표준 해상도 (모든 페이지 동일)
   const STANDARD_WIDTH = 1200;
 
-  // 배경 이미지를 canvas에 그리기
-  const drawBackground = useCallback((canvas: HTMLCanvasElement, image: HTMLImageElement) => {
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // canvas 크기를 이미지 비율에 맞춰 설정
-    const container = containerRef.current;
-    if (!container) return;
-
-    const rect = container.getBoundingClientRect();
-    const ratio = Math.max(window.devicePixelRatio || 1, 1);
-
-    canvas.style.width = `${rect.width}px`;
-    canvas.style.height = `${rect.height}px`;
-    canvas.width = rect.width * ratio;
-    canvas.height = rect.height * ratio;
-
-    ctx.scale(ratio, ratio);
-
-    // 배경 이미지 그리기 (컨테이너에 맞춰 중앙 정렬)
-    const scale = Math.min(rect.width / image.width, rect.height / image.height);
-    const x = (rect.width - image.width * scale) / 2;
-    const y = (rect.height - image.height * scale) / 2;
-
-    ctx.drawImage(image, x, y, image.width * scale, image.height * scale);
-    console.log(`[${documentType}] 배경 이미지 그림 완료`);
-  }, [documentType]);
-
   // 서명 패드 초기화 - 배경 이미지 로드 후 실행
   useEffect(() => {
     if (isLoading || !canvasRef.current || !containerRef.current || !backgroundImage) {
@@ -123,26 +94,33 @@ export default function PDFSignaturePad({
 
       console.log(`SignaturePad 초기화 시작 (페이지 ${currentPage})`);
 
-      // 캔버스를 원본 이미지 크기로 설정 (좌표 일치를 위해)
+      // 표준 높이 계산
+      const standardHeight = Math.round((STANDARD_WIDTH / backgroundImage.width) * backgroundImage.height);
+
+      // 캔버스를 표준 크기로 설정 (모든 페이지 동일)
       const resizeCanvas = () => {
-        const img = backgroundImage;
+        canvas.width = STANDARD_WIDTH;
+        canvas.height = standardHeight;
 
-        // 캔버스 실제 크기 = 원본 이미지 크기
-        canvas.width = img.width;
-        canvas.height = img.height;
-
-        // CSS로 화면에 맞춰 표시 (컨테이너에 맞춤)
+        // CSS로 화면에 맞춰 표시
         const rect = container.getBoundingClientRect();
         canvas.style.width = `${rect.width}px`;
         canvas.style.height = `${rect.height}px`;
 
+        // 배경 이미지 그리기
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          ctx.drawImage(backgroundImage, 0, 0, STANDARD_WIDTH, standardHeight);
+        }
+
         console.log('Canvas 크기:', {
-          canvasWidth: canvas.width,
-          canvasHeight: canvas.height,
+          canvasWidth: STANDARD_WIDTH,
+          canvasHeight: standardHeight,
           displayWidth: rect.width,
           displayHeight: rect.height,
-          imageWidth: img.width,
-          imageHeight: img.height
+          imageWidth: backgroundImage.width,
+          imageHeight: backgroundImage.height
         });
       };
 
@@ -151,8 +129,8 @@ export default function PDFSignaturePad({
       const pad = new SignaturePad(canvas, {
         backgroundColor: 'rgba(0, 0, 0, 0)', // 투명 배경
         penColor: 'rgb(0, 0, 0)', // 검은색 서명
-        minWidth: 1.5,
-        maxWidth: 3,
+        minWidth: 2,
+        maxWidth: 4,
       });
 
       console.log('SignaturePad 생성 완료:', pad);
@@ -163,6 +141,11 @@ export default function PDFSignaturePad({
         const data = pad.toData();
         resizeCanvas();
         pad.clear();
+        // 배경 이미지를 다시 그린 후 서명 복원
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(backgroundImage, 0, 0, STANDARD_WIDTH, standardHeight);
+        }
         pad.fromData(data);
       };
 
@@ -287,29 +270,9 @@ export default function PDFSignaturePad({
       // 2. 해당 페이지에 서명이 있으면 위에 그리기
       const pageSignature = allSignatures.get(page);
       if (pageSignature && pageSignature.length > 0) {
-        console.log(`[${documentType}] 페이지 ${page}의 서명 추가 (원본: ${img.width}x${img.height} → 표준: ${STANDARD_WIDTH}x${standardHeight})`);
+        console.log(`[${documentType}] 페이지 ${page}의 서명 추가 (표준: ${STANDARD_WIDTH}x${standardHeight})`);
 
-        // 서명 좌표를 표준 크기로 스케일링 (서명 좌표는 이미 원본 이미지 크기 기준)
-        const scaleX = STANDARD_WIDTH / img.width;
-        const scaleY = standardHeight / img.height;
-
-        console.log(`[${documentType}] 스케일 비율: X=${scaleX.toFixed(3)}, Y=${scaleY.toFixed(3)}`);
-
-        // 스케일링된 서명 데이터 생성
-        const scaledSignature = pageSignature.map((stroke: any) => {
-          if (!stroke.points || stroke.points.length === 0) return stroke;
-
-          return {
-            ...stroke,
-            points: stroke.points.map((point: any) => ({
-              ...point,
-              x: point.x * scaleX,
-              y: point.y * scaleY,
-              time: point.time
-            }))
-          };
-        });
-
+        // 서명은 이미 표준 크기(1200px) 기준으로 저장되어 있음 - 스케일링 불필요!
         // 임시 캔버스에 서명 그리기 (표준 크기)
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = STANDARD_WIDTH;
@@ -317,10 +280,11 @@ export default function PDFSignaturePad({
         const tempPad = new SignaturePad(tempCanvas);
 
         try {
-          tempPad.fromData(scaledSignature);
+          // 서명 데이터를 그대로 사용 (이미 1200px 기준)
+          tempPad.fromData(pageSignature);
           // 서명을 배경 위에 그림
           ctx.drawImage(tempCanvas, 0, 0);
-          console.log(`[${documentType}] 페이지 ${page} 서명 렌더링 완료`);
+          console.log(`[${documentType}] 페이지 ${page} 서명 렌더링 완료 (포인트 수: ${pageSignature.length})`);
         } catch (e) {
           console.error(`[${documentType}] 페이지 ${page} 서명 렌더링 실패:`, e);
         }
@@ -356,15 +320,29 @@ export default function PDFSignaturePad({
 
   // 페이지 변경 시 서명 불러오기
   useEffect(() => {
-    if (!signaturePad || !currentPage) return;
+    if (!signaturePad || !currentPage || !backgroundImage || !canvasRef.current) return;
 
     console.log(`[${documentType}] 페이지 ${currentPage}로 전환 - 서명 로드 시도`);
 
     // 약간의 지연을 두어 state 업데이트가 완료되도록 함
     const timer = setTimeout(() => {
+      const canvas = canvasRef.current;
+      if (!canvas || !backgroundImage) return;
+
+      // 표준 높이 계산
+      const standardHeight = Math.round((STANDARD_WIDTH / backgroundImage.width) * backgroundImage.height);
+
+      // 배경 이미지를 먼저 그림
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(backgroundImage, 0, 0, STANDARD_WIDTH, standardHeight);
+      }
+
+      // 저장된 서명이 있으면 복원
       const savedSignature = pageSignatures.get(currentPage);
       if (savedSignature && savedSignature.length > 0) {
-        console.log(`[${documentType}] 페이지 ${currentPage}의 저장된 서명 불러옴 (${savedSignature.length}개 포인트)`);
+        console.log(`[${documentType}] 페이지 ${currentPage}의 저장된 서명 불러옴 (${savedSignature.length}개 스트로크)`);
         signaturePad.clear();
         signaturePad.fromData(savedSignature);
       } else {
@@ -375,7 +353,7 @@ export default function PDFSignaturePad({
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, signaturePad, documentType]);
+  }, [currentPage, signaturePad, documentType, backgroundImage]);
   // pageSignatures는 의도적으로 제외하여 무한 루프 방지
 
 
@@ -419,24 +397,18 @@ export default function PDFSignaturePad({
       {/* 이미지 뷰어 + 서명 오버레이 - 전체화면 */}
       <div
         ref={containerRef}
-        className="flex-1 relative bg-white overflow-hidden flex items-center justify-center"
+        className="flex-1 relative bg-gray-100 overflow-hidden flex items-center justify-center"
       >
-        {/* PDF 페이지 이미지 (배경) */}
-        <img
-          ref={imageRef}
-          src={`/img/${imagePrefix}_페이지_${currentPage}.jpg`}
-          alt={`페이지 ${currentPage}`}
-          className="max-w-full max-h-full object-contain"
-          style={{ pointerEvents: 'none', userSelect: 'none' }}
-        />
-
-        {/* 서명 캔버스 오버레이 */}
+        {/* 서명 캔버스 (배경 이미지 포함) */}
         <canvas
           ref={canvasRef}
-          className="absolute top-0 left-0 w-full h-full cursor-crosshair"
+          className="cursor-crosshair"
           style={{
             touchAction: 'none',
             pointerEvents: 'auto',
+            maxWidth: '100%',
+            maxHeight: '100%',
+            objectFit: 'contain'
           }}
         />
       </div>
