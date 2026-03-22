@@ -105,10 +105,22 @@ export default function PDFContractForm() {
 
   const submitContract = async (applicationSignature: string, termsSignature: string) => {
     setIsSubmitting(true);
-    setMessage(null);
 
     try {
-      // 계약 데이터 저장 (두 개의 서명)
+      // 1단계: 데이터 준비 중
+      setMessage({
+        type: 'success',
+        text: '📝 계약 데이터 준비 중...'
+      });
+
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      // 2단계: 서버 전송 중
+      setMessage({
+        type: 'success',
+        text: '📤 서버에 전송 중...'
+      });
+
       const contractResponse = await fetch('/api/contracts', {
         method: 'POST',
         headers: {
@@ -125,9 +137,18 @@ export default function PDFContractForm() {
       });
 
       if (contractResponse.ok) {
+        // 3단계: 저장 완료
         setMessage({
           type: 'success',
-          text: '✅ 계약이 완료되었습니다!'
+          text: '💾 데이터베이스 저장 중...'
+        });
+
+        await new Promise(resolve => setTimeout(resolve, 500));
+
+        // 4단계: 완료
+        setMessage({
+          type: 'success',
+          text: '✅ 계약이 성공적으로 완료되었습니다!'
         });
 
         // 3초 후 자동 초기화
@@ -139,14 +160,14 @@ export default function PDFContractForm() {
         const error = await contractResponse.json();
         setMessage({
           type: 'error',
-          text: error.error || '계약 처리 중 오류가 발생했습니다.'
+          text: '❌ ' + (error.error || '계약 처리 중 오류가 발생했습니다.')
         });
       }
     } catch (error) {
       console.error('계약 처리 오류:', error);
       setMessage({
         type: 'error',
-        text: '계약 처리 중 오류가 발생했습니다.'
+        text: '❌ 네트워크 오류가 발생했습니다. 다시 시도해주세요.'
       });
     } finally {
       setIsSubmitting(false);

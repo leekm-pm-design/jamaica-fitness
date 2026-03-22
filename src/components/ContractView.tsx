@@ -123,8 +123,8 @@ export default function ContractView({ contractId }: Props) {
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col">
-      {/* 상단 헤더 */}
-      <div className="bg-white border-b shadow-sm">
+      {/* 상단 헤더 - 인쇄 시 숨김 */}
+      <div className="no-print bg-white border-b shadow-sm">
         <div className="max-w-7xl mx-auto px-4 py-3">
           <div className="flex justify-between items-center mb-3">
             <div>
@@ -179,8 +179,8 @@ export default function ContractView({ contractId }: Props) {
       </div>
 
       {/* 문서 이미지 뷰어 */}
-      <div className="flex-1 bg-gray-200 flex items-center justify-center p-4">
-        <div className="max-w-4xl w-full bg-white shadow-lg rounded-lg overflow-hidden">
+      <div className="flex-1 bg-gray-200 flex items-center justify-center p-4 print:p-0 print:bg-white">
+        <div className="max-w-4xl w-full bg-white shadow-lg rounded-lg overflow-hidden print:shadow-none print:rounded-none print:max-w-none">
           {/* 페이지 이미지 */}
           <div className="relative bg-white">
             {/* 입회신청서 마지막 페이지이고 서명 데이터가 있으면 서명된 이미지 표시, 아니면 원본 */}
@@ -190,9 +190,9 @@ export default function ContractView({ contractId }: Props) {
                 <img
                   src={contract.signatureData}
                   alt={`${DOCUMENT_CONFIG[activeDocument].title} ${currentPage}페이지 (서명됨)`}
-                  className="w-full h-auto"
+                  className="w-full h-auto print:max-w-full"
                 />
-                <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded shadow-lg">
+                <div className="no-print absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded shadow-lg">
                   ✓ 서명완료
                 </div>
               </>
@@ -201,13 +201,13 @@ export default function ContractView({ contractId }: Props) {
               <img
                 src={`/img/${imagePrefix}_페이지_${currentPage}.jpg`}
                 alt={`${DOCUMENT_CONFIG[activeDocument].title} ${currentPage}페이지`}
-                className="w-full h-auto"
+                className="w-full h-auto print:max-w-full"
               />
             )}
           </div>
 
-          {/* 페이지 네비게이션 */}
-          <div className="bg-gray-50 border-t p-3">
+          {/* 페이지 네비게이션 - 인쇄 시 숨김 */}
+          <div className="no-print bg-gray-50 border-t p-3">
             <div className="flex items-center justify-between gap-2">
               <button
                 onClick={() => handlePageChange(currentPage - 1)}
@@ -241,11 +241,31 @@ export default function ContractView({ contractId }: Props) {
       {/* 인쇄용 CSS */}
       <style jsx global>{`
         @media print {
+          /* 인쇄 시 헤더, 버튼, 배경 등 숨기기 */
           .no-print {
             display: none !important;
           }
+
+          /* 페이지 여백 최소화 */
+          @page {
+            margin: 0;
+            size: A4;
+          }
+
           body {
-            background: white;
+            margin: 0;
+            padding: 0;
+            background: white !important;
+          }
+
+          /* 문서 이미지만 표시 */
+          img {
+            display: block;
+            width: 100% !important;
+            max-width: 100% !important;
+            height: auto !important;
+            page-break-after: auto;
+            page-break-inside: avoid;
           }
         }
       `}</style>

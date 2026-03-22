@@ -390,9 +390,9 @@ export default function PDFSignaturePad({
           <button
             onClick={handleComplete}
             disabled={isSaving}
-            className={`flex-1 py-2 ${isSaving ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'} text-white text-xs sm:text-sm font-medium rounded transition-colors whitespace-nowrap`}
+            className={`flex-1 py-2 ${isSaving ? 'bg-blue-400 cursor-not-allowed animate-pulse' : 'bg-green-600 hover:bg-green-700'} text-white text-xs sm:text-sm font-medium rounded transition-colors whitespace-nowrap`}
           >
-            {isSaving ? '저장 중...' : '서명완료'}
+            {isSaving ? '⏳ 처리 중...' : '✓ 서명완료'}
           </button>
         </div>
       </div>
