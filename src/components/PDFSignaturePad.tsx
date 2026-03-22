@@ -243,11 +243,12 @@ export default function PDFSignaturePad({
 
     console.log(`[${documentType}] 전체 ${pageImages.length}개 페이지 이미지 로드 완료`);
 
-    // 모든 페이지를 세로로 이어붙인 큰 캔버스 생성
+    // 모든 페이지를 세로로 이어붙인 큰 캔버스 생성 (50% 크기로 축소하여 용량 절감)
     const firstImg = pageImages[0];
+    const scaleFactor = 0.5; // 50% 크기로 축소
     const mergedCanvas = document.createElement('canvas');
-    mergedCanvas.width = firstImg.width;
-    mergedCanvas.height = firstImg.height * totalPages;
+    mergedCanvas.width = firstImg.width * scaleFactor;
+    mergedCanvas.height = firstImg.height * totalPages * scaleFactor;
 
     const ctx = mergedCanvas.getContext('2d');
     if (!ctx) {
@@ -259,10 +260,10 @@ export default function PDFSignaturePad({
     // 각 페이지를 순서대로 그리기
     for (let page = 1; page <= totalPages; page++) {
       const img = pageImages[page - 1];
-      const yOffset = (page - 1) * img.height;
+      const yOffset = (page - 1) * img.height * scaleFactor;
 
-      // 1. 배경 이미지 그리기
-      ctx.drawImage(img, 0, yOffset);
+      // 1. 배경 이미지 그리기 (축소된 크기로)
+      ctx.drawImage(img, 0, yOffset, img.width * scaleFactor, img.height * scaleFactor);
 
       // 2. 해당 페이지에 서명이 있으면 그리기
       const pageSignature = allSignatures.get(page);
@@ -276,15 +277,15 @@ export default function PDFSignaturePad({
         const tempPad = new SignaturePad(tempCanvas);
         tempPad.fromData(pageSignature);
 
-        // 서명을 해당 위치에 그림
-        ctx.drawImage(tempCanvas, 0, yOffset);
+        // 서명을 해당 위치에 그림 (축소된 크기로)
+        ctx.drawImage(tempCanvas, 0, yOffset, img.width * scaleFactor, img.height * scaleFactor);
       }
     }
 
-    console.log(`[${documentType}] 전체 페이지 합성 완료`);
+    console.log(`[${documentType}] 전체 페이지 합성 완료 (크기: ${mergedCanvas.width}x${mergedCanvas.height})`);
 
-    // 3. 합쳐진 이미지를 JPEG로 변환 (품질 0.5로 용량 절감)
-    const signatureData = mergedCanvas.toDataURL('image/jpeg', 0.5);
+    // 3. 합쳐진 이미지를 JPEG로 변환 (품질 0.3, 크기 50%로 용량 대폭 절감)
+    const signatureData = mergedCanvas.toDataURL('image/jpeg', 0.3);
 
     console.log(`[${documentType}] 서명 완료 (배경+서명 합성):`, {
       totalSignedPages: pageSignatures.size,
