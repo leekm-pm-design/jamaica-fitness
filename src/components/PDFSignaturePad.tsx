@@ -243,9 +243,9 @@ export default function PDFSignaturePad({
 
     console.log(`[${documentType}] 전체 ${pageImages.length}개 페이지 이미지 로드 완료`);
 
-    // 서명만 세로로 이어붙인 투명 캔버스 생성 (배경 제외 - 용량 최소화)
+    // 배경 + 서명을 합친 캔버스 생성 (30% 크기로 축소하여 용량 최소화)
     const firstImg = pageImages[0];
-    const scaleFactor = 0.5; // 50% 크기로 축소
+    const scaleFactor = 0.3; // 30% 크기로 축소 (더 작게)
     const mergedCanvas = document.createElement('canvas');
     mergedCanvas.width = firstImg.width * scaleFactor;
     mergedCanvas.height = firstImg.height * totalPages * scaleFactor;
@@ -257,15 +257,15 @@ export default function PDFSignaturePad({
       return;
     }
 
-    // 투명 배경 (배경 이미지는 ContractView에서 별도로 렌더링)
-    // 서명만 그려서 오버레이 방식으로 표시
-
-    // 각 페이지의 서명만 그리기 (배경 이미지 제외)
+    // 각 페이지의 배경 이미지 + 서명을 함께 그리기
     for (let page = 1; page <= totalPages; page++) {
       const img = pageImages[page - 1];
       const yOffset = (page - 1) * img.height * scaleFactor;
 
-      // 해당 페이지에 서명이 있으면 그리기
+      // 1. 배경 이미지 그리기
+      ctx.drawImage(img, 0, yOffset, img.width * scaleFactor, img.height * scaleFactor);
+
+      // 2. 해당 페이지에 서명이 있으면 위에 그리기
       const pageSignature = allSignatures.get(page);
       if (pageSignature && pageSignature.length > 0) {
         console.log(`[${documentType}] 페이지 ${page}의 서명 추가`);
@@ -277,15 +277,15 @@ export default function PDFSignaturePad({
         const tempPad = new SignaturePad(tempCanvas);
         tempPad.fromData(pageSignature);
 
-        // 서명을 해당 위치에 그림 (축소된 크기로)
+        // 서명을 배경 위에 그림 (축소된 크기로)
         ctx.drawImage(tempCanvas, 0, yOffset, img.width * scaleFactor, img.height * scaleFactor);
       }
     }
 
     console.log(`[${documentType}] 전체 페이지 합성 완료 (크기: ${mergedCanvas.width}x${mergedCanvas.height})`);
 
-    // 3. 서명만 포함된 이미지를 PNG로 변환 (투명도 유지)
-    const signatureData = mergedCanvas.toDataURL('image/png');
+    // 3. 합쳐진 이미지를 JPEG로 변환 (품질 0.15 - 더 압축)
+    const signatureData = mergedCanvas.toDataURL('image/jpeg', 0.15);
 
     console.log(`[${documentType}] 서명 완료 (배경+서명 합성):`, {
       totalSignedPages: pageSignatures.size,
