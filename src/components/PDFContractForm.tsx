@@ -19,7 +19,7 @@ export default function PDFContractForm() {
   });
 
   const [step, setStep] = useState<SignatureStep>(1);
-  const [activeDocument, setActiveDocument] = useState<DocumentType>('application');
+  const [activeDocument, setActiveDocument] = useState<DocumentType>('terms'); // 회원약관부터 시작
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<MessageState | null>(null);
   const [showTermsModal, setShowTermsModal] = useState(false);
@@ -54,41 +54,39 @@ export default function PDFContractForm() {
       return;
     }
     setStep(2); // 서명 화면으로 이동
-    setActiveDocument('application'); // 입회신청서부터 시작
+    setActiveDocument('terms'); // 회원약관부터 시작
     setMessage(null);
   };
 
-  // 입회신청서 서명 완료
-  const handleApplicationComplete = (signatureData: string, pdfData: ArrayBuffer) => {
-    setFormData(prev => ({
-      ...prev,
-      applicationSignature: signatureData,
-      pdfData
-    }));
-    setMessage({
-      type: 'success',
-      text: '입회신청서 서명이 완료되었습니다!'
-    });
-    // 자동으로 회원약관 탭으로 전환
-    setTimeout(() => {
-      setActiveDocument('terms');
-      setMessage(null);
-    }, 1500);
-  };
-
-  // 회원약관 서명 완료
-  const handleTermsComplete = async (signatureData: string, pdfData: ArrayBuffer) => {
+  // 회원약관 서명 완료 (먼저)
+  const handleTermsComplete = (signatureData: string, pdfData: ArrayBuffer) => {
     console.log('회원약관 서명 완료 호출됨', {
-      hasApplicationSignature: !!formData.applicationSignature,
       termsSignatureLength: signatureData.length
     });
 
-    // 두 서명 모두 완료 확인
-    if (!formData.applicationSignature) {
-      console.log('입회신청서 서명 없음 - 에러 메시지 표시');
+    setFormData(prev => ({
+      ...prev,
+      termsSignature: signatureData,
+      pdfData
+    }));
+
+    // 팝업 없이 자동으로 입회신청서 탭으로 전환
+    setActiveDocument('application');
+  };
+
+  // 입회신청서 서명 완료 (나중 - 최종 제출)
+  const handleApplicationComplete = async (signatureData: string, pdfData: ArrayBuffer) => {
+    console.log('입회신청서 서명 완료 호출됨', {
+      hasTermsSignature: !!formData.termsSignature,
+      applicationSignatureLength: signatureData.length
+    });
+
+    // 회원약관 서명 확인
+    if (!formData.termsSignature) {
+      console.log('회원약관 서명 없음 - 에러 메시지 표시');
       setMessage({
         type: 'error',
-        text: '입회신청서 서명을 먼저 완료해주세요.'
+        text: '회원약관 서명을 먼저 완료해주세요.'
       });
       return;
     }
@@ -96,11 +94,11 @@ export default function PDFContractForm() {
     console.log('두 서명 모두 있음 - 제출 시작');
     setFormData(prev => ({
       ...prev,
-      termsSignature: signatureData
+      applicationSignature: signatureData
     }));
 
     // 두 서명 모두 완료 후 자동 제출
-    await submitContract(formData.applicationSignature, signatureData);
+    await submitContract(signatureData, formData.termsSignature);
   };
 
   const submitContract = async (applicationSignature: string, termsSignature: string) => {
@@ -213,16 +211,6 @@ export default function PDFContractForm() {
           <div className="max-w-7xl mx-auto px-4">
             <div className="flex gap-4">
               <button
-                onClick={() => setActiveDocument('application')}
-                className={`py-2 px-4 text-sm font-medium border-b-2 transition-colors ${
-                  activeDocument === 'application'
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                입회신청서 (6p) {formData.applicationSignature && '✓'}
-              </button>
-              <button
                 onClick={() => setActiveDocument('terms')}
                 className={`py-2 px-4 text-sm font-medium border-b-2 transition-colors ${
                   activeDocument === 'terms'
@@ -230,7 +218,17 @@ export default function PDFContractForm() {
                     : 'border-transparent text-gray-500 hover:text-gray-700'
                 }`}
               >
-                회원약관 (9p) {formData.termsSignature && '✓'}
+                1. 회원약관 (9p) {formData.termsSignature && '✓'}
+              </button>
+              <button
+                onClick={() => setActiveDocument('application')}
+                className={`py-2 px-4 text-sm font-medium border-b-2 transition-colors ${
+                  activeDocument === 'application'
+                    ? 'border-blue-600 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                2. 입회신청서 (6p) {formData.applicationSignature && '✓'}
               </button>
             </div>
           </div>
@@ -250,20 +248,7 @@ export default function PDFContractForm() {
 
         {/* 문서별 서명 패드 - 조건부 렌더링 */}
         <div className="flex-1 overflow-hidden">
-          {activeDocument === 'application' ? (
-            <PDFSignaturePad
-              key="application"
-              pdfUrl="/입회신청서.pdf"
-              documentType="application"
-              totalPages={6}
-              pageSignatures={applicationPageSignatures}
-              onPageSignaturesChange={setApplicationPageSignatures}
-              currentPage={applicationCurrentPage}
-              onCurrentPageChange={setApplicationCurrentPage}
-              onSignatureComplete={handleApplicationComplete}
-              onBack={handleBackToForm}
-            />
-          ) : (
+          {activeDocument === 'terms' ? (
             <PDFSignaturePad
               key="terms"
               pdfUrl="/회원약관.pdf"
@@ -274,6 +259,19 @@ export default function PDFContractForm() {
               currentPage={termsCurrentPage}
               onCurrentPageChange={setTermsCurrentPage}
               onSignatureComplete={handleTermsComplete}
+              onBack={handleBackToForm}
+            />
+          ) : (
+            <PDFSignaturePad
+              key="application"
+              pdfUrl="/입회신청서.pdf"
+              documentType="application"
+              totalPages={6}
+              pageSignatures={applicationPageSignatures}
+              onPageSignaturesChange={setApplicationPageSignatures}
+              currentPage={applicationCurrentPage}
+              onCurrentPageChange={setApplicationCurrentPage}
+              onSignatureComplete={handleApplicationComplete}
               onBack={handleBackToForm}
             />
           )}
