@@ -125,28 +125,43 @@ export default function ContractView({ contractId }: Props) {
   // 전체 페이지 렌더링 (프린트용)
   const renderAllPages = (docType: DocumentType) => {
     const prefix = docType === 'application' ? '입회신청서' : '회원약관';
+    const pages = DOCUMENT_CONFIG[docType].totalPages;
 
-    // 서명 데이터 확인 (전체 페이지를 세로로 이어붙인 이미지)
-    const signedImage = docType === 'application' ? contract.signatureData : contract.termsSignatureData;
+    // 서명 데이터 확인 (서명만 포함된 이미지)
+    const signatureImage = docType === 'application' ? contract.signatureData : contract.termsSignatureData;
 
-    if (signedImage) {
-      // 서명된 전체 이미지가 있으면 이것을 출력 (CSS에서 자동으로 페이지 분할)
+    if (signatureImage) {
+      // 서명이 있으면 배경 이미지 위에 서명 오버레이
       return (
-        <div key={`${docType}-signed`} className="print-long-image">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={signedImage}
-            alt={`${prefix} (서명됨)`}
-            className="w-full h-auto"
-          />
+        <div key={`${docType}-signed`} className="print-long-image-container">
+          {/* 배경 이미지들을 세로로 배치 */}
+          <div className="background-images">
+            {Array.from({ length: pages }, (_, i) => i + 1).map(page => (
+              <div key={`${docType}-bg-${page}`} className="print-page">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/img/${prefix}_페이지_${page}.jpg`}
+                  alt={`${prefix} ${page}페이지`}
+                  className="w-full h-auto"
+                />
+              </div>
+            ))}
+          </div>
+          {/* 서명 이미지를 위에 오버레이 */}
+          <div className="signature-overlay">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={signatureImage}
+              alt={`${prefix} 서명`}
+              className="w-full h-auto"
+            />
+          </div>
         </div>
       );
     }
 
-    // 서명이 없으면 원본 이미지 사용
-    const pages = DOCUMENT_CONFIG[docType].totalPages;
+    // 서명이 없으면 원본 이미지만 사용
     const pageElements = [];
-
     for (let page = 1; page <= pages; page++) {
       pageElements.push(
         <div key={`${docType}-${page}`} className="print-page">
@@ -225,21 +240,39 @@ export default function ContractView({ contractId }: Props) {
         <div className="max-w-4xl w-full bg-white shadow-lg rounded-lg overflow-hidden">
           {/* 페이지 이미지 */}
           <div className="relative bg-white max-h-[70vh] overflow-y-auto">
-            {/* 서명 데이터가 있으면 전체 이미지 표시 */}
+            {/* 서명 데이터가 있으면 배경 + 서명 오버레이 */}
             {((activeDocument === 'application' && contract.signatureData) ||
               (activeDocument === 'terms' && contract.termsSignatureData)) ? (
               <>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={
-                    activeDocument === 'application'
-                      ? contract.signatureData
-                      : contract.termsSignatureData!
-                  }
-                  alt={`${DOCUMENT_CONFIG[activeDocument].title} (서명됨)`}
-                  className="w-full h-auto"
-                />
-                <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded shadow-lg">
+                <div className="print-long-image-container">
+                  {/* 배경 이미지들 */}
+                  <div className="background-images">
+                    {Array.from({ length: totalPages }, (_, i) => i + 1).map(page => (
+                      <div key={`screen-${activeDocument}-bg-${page}`}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={`/img/${imagePrefix}_페이지_${page}.jpg`}
+                          alt={`${DOCUMENT_CONFIG[activeDocument].title} ${page}페이지`}
+                          className="w-full h-auto"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  {/* 서명 오버레이 */}
+                  <div className="signature-overlay">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={
+                        activeDocument === 'application'
+                          ? contract.signatureData
+                          : contract.termsSignatureData!
+                      }
+                      alt={`${DOCUMENT_CONFIG[activeDocument].title} 서명`}
+                      className="w-full h-auto"
+                    />
+                  </div>
+                </div>
+                <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded shadow-lg z-10">
                   ✓ 서명완료
                 </div>
               </>
@@ -353,18 +386,30 @@ export default function ContractView({ contractId }: Props) {
             page-break-after: auto;
           }
 
-          /* 긴 이미지 (전체 페이지 합친 것) - 자동 페이지 분할 */
-          .print-long-image {
-            page-break-inside: auto;
+          /* 서명 오버레이 컨테이너 */
+          .print-long-image-container {
+            position: relative;
           }
 
-          .print-long-image img {
+          .background-images {
+            position: relative;
+          }
+
+          .signature-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+          }
+
+          .signature-overlay img {
             display: block;
             width: 100% !important;
             max-width: 100% !important;
             height: auto !important;
             margin: 0 auto;
-            page-break-inside: auto;
           }
 
           /* 이미지 최적화 */
@@ -375,6 +420,30 @@ export default function ContractView({ contractId }: Props) {
             height: auto !important;
             margin: 0 auto;
           }
+        }
+
+        /* 화면 보기에서도 오버레이 적용 */
+        .print-long-image-container {
+          position: relative;
+        }
+
+        .background-images {
+          position: relative;
+        }
+
+        .signature-overlay {
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          pointer-events: none;
+        }
+
+        .signature-overlay img {
+          display: block;
+          width: 100%;
+          height: auto;
         }
       `}</style>
     </div>
