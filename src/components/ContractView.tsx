@@ -130,9 +130,9 @@ export default function ContractView({ contractId }: Props) {
     const signedImage = docType === 'application' ? contract.signatureData : contract.termsSignatureData;
 
     if (signedImage) {
-      // 서명된 전체 이미지가 있으면 이것만 출력
+      // 서명된 전체 이미지가 있으면 이것을 출력 (CSS에서 자동으로 페이지 분할)
       return (
-        <div key={`${docType}-signed`} className="print-page">
+        <div key={`${docType}-signed`} className="print-long-image">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={signedImage}
@@ -351,6 +351,20 @@ export default function ContractView({ contractId }: Props) {
 
           .print-page:last-child {
             page-break-after: auto;
+          }
+
+          /* 긴 이미지 (전체 페이지 합친 것) - 자동 페이지 분할 */
+          .print-long-image {
+            page-break-inside: auto;
+          }
+
+          .print-long-image img {
+            display: block;
+            width: 100% !important;
+            max-width: 100% !important;
+            height: auto !important;
+            margin: 0 auto;
+            page-break-inside: auto;
           }
 
           /* 이미지 최적화 */
