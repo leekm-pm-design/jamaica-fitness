@@ -2,6 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { DOCUMENT_CONFIG } from '@/constants/membership';
 
 interface ContractData {
   id: number;
@@ -19,10 +20,14 @@ interface Props {
   contractId: number;
 }
 
+type DocumentType = 'application' | 'terms';
+
 export default function ContractView({ contractId }: Props) {
   const [contract, setContract] = useState<ContractData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeDocument, setActiveDocument] = useState<DocumentType>('application');
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     const fetchContract = async () => {
@@ -49,6 +54,11 @@ export default function ContractView({ contractId }: Props) {
     fetchContract();
   }, [contractId]);
 
+  // 문서 변경 시 페이지 리셋
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeDocument]);
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString('ko-KR', {
@@ -67,6 +77,13 @@ export default function ContractView({ contractId }: Props) {
 
   const handlePrint = () => {
     window.print();
+  };
+
+  const handlePageChange = (newPage: number) => {
+    const totalPages = DOCUMENT_CONFIG[activeDocument].totalPages;
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
+    }
   };
 
   if (isLoading) {
@@ -101,133 +118,137 @@ export default function ContractView({ contractId }: Props) {
     );
   }
 
+  const imagePrefix = activeDocument === 'application' ? '입회신청서' : '회원약관';
+  const totalPages = DOCUMENT_CONFIG[activeDocument].totalPages;
+
   return (
-    <div className="min-h-screen bg-white">
-      {/* 인쇄 버튼 - 인쇄시 숨김 */}
-      <div className="no-print p-4 border-b bg-gray-50">
-        <div className="max-w-4xl mx-auto flex justify-between items-center">
-          <h1 className="text-lg font-medium text-gray-800">계약서 보기</h1>
-          <button
-            onClick={handlePrint}
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
-          >
-            인쇄
-          </button>
+    <div className="min-h-screen bg-gray-100 flex flex-col">
+      {/* 상단 헤더 */}
+      <div className="bg-white border-b shadow-sm">
+        <div className="max-w-7xl mx-auto px-4 py-3">
+          <div className="flex justify-between items-center mb-3">
+            <div>
+              <h1 className="text-xl font-bold text-gray-800">계약서 보기</h1>
+              <div className="text-sm text-gray-600 mt-1">
+                {contract.customer.name} · {formatPhone(contract.customer.phone)} · {contract.customer.membershipType}
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                계약일: {formatDate(contract.contractDate)}
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => window.history.back()}
+                className="px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition-colors"
+              >
+                돌아가기
+              </button>
+              <button
+                onClick={handlePrint}
+                className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+              >
+                인쇄
+              </button>
+            </div>
+          </div>
+
+          {/* 탭 네비게이션 */}
+          <div className="flex gap-4">
+            <button
+              onClick={() => setActiveDocument('application')}
+              className={`py-2 px-4 text-sm font-medium border-b-2 transition-colors ${
+                activeDocument === 'application'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              입회신청서 (6페이지)
+            </button>
+            <button
+              onClick={() => setActiveDocument('terms')}
+              className={`py-2 px-4 text-sm font-medium border-b-2 transition-colors ${
+                activeDocument === 'terms'
+                  ? 'border-blue-600 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >
+              회원약관 (9페이지)
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* 계약서 내용 */}
-      <div className="max-w-4xl mx-auto p-8">
-        {/* 헤더 */}
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">
-            JAMAICA FITNESS
-          </h1>
-          <h2 className="text-xl text-gray-600 mb-4">
-            회원 가입 계약서
-          </h2>
-          <div className="text-sm text-gray-500">
-            계약일: {formatDate(contract.contractDate)}
+      {/* 문서 이미지 뷰어 */}
+      <div className="flex-1 bg-gray-200 flex items-center justify-center p-4">
+        <div className="max-w-4xl w-full bg-white shadow-lg rounded-lg overflow-hidden">
+          {/* 페이지 이미지 */}
+          <div className="relative bg-white">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`/img/${imagePrefix}_페이지_${currentPage}.jpg`}
+              alt={`${DOCUMENT_CONFIG[activeDocument].title} ${currentPage}페이지`}
+              className="w-full h-auto"
+            />
+
+            {/* 서명이 있고 입회신청서 마지막 페이지인 경우 서명 표시 */}
+            {activeDocument === 'application' && currentPage === 6 && contract.signatureData && (
+              <div className="absolute bottom-0 left-0 right-0 p-4">
+                <div className="bg-white/90 backdrop-blur-sm rounded-lg p-3 shadow-lg">
+                  <div className="text-xs font-medium text-gray-700 mb-2">고객 서명:</div>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={contract.signatureData}
+                    alt="고객 서명"
+                    className="max-h-24 mx-auto"
+                  />
+                </div>
+              </div>
+            )}
           </div>
-        </div>
 
-        <hr className="border-gray-300 mb-8" />
+          {/* 페이지 네비게이션 */}
+          <div className="bg-gray-50 border-t p-3">
+            <div className="flex items-center justify-between gap-2">
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                ◀ 이전
+              </button>
 
-        {/* 고객 정보 */}
-        <div className="mb-8">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">고객 정보</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-            <div>
-              <span className="font-medium text-gray-700">성명:</span>
-              <span className="ml-2 text-gray-900">{contract.customer.name}</span>
-            </div>
-            <div>
-              <span className="font-medium text-gray-700">연락처:</span>
-              <span className="ml-2 text-gray-900">{formatPhone(contract.customer.phone)}</span>
-            </div>
-            <div>
-              <span className="font-medium text-gray-700">회원권:</span>
-              <span className="ml-2 text-gray-900">{contract.customer.membershipType}</span>
-            </div>
-          </div>
-        </div>
+              <div className="text-center">
+                <div className="text-sm font-medium text-gray-700">
+                  {currentPage} / {totalPages}
+                </div>
+                <div className="text-xs text-gray-500">
+                  {DOCUMENT_CONFIG[activeDocument].title}
+                </div>
+              </div>
 
-        {/* 이용약관 */}
-        <div className="mb-8">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">이용약관</h3>
-          <div className="bg-gray-50 p-6 rounded-lg text-sm leading-relaxed">
-            <h4 className="font-medium mb-3">제1조 (목적)</h4>
-            <p className="mb-4">
-              본 약관은 Jamaica Fitness(이하 &quot;회사&quot;라 한다)가 제공하는 피트니스 서비스
-              이용과 관련하여 회사와 이용고객(이하 &quot;회원&quot;이라 한다) 간의 권리, 의무 및
-              책임사항을 규정함을 목적으로 합니다.
-            </p>
-
-            <h4 className="font-medium mb-3">제2조 (시설 이용)</h4>
-            <p className="mb-4">
-              회원은 운영시간 내에 회사가 제공하는 운동시설 및 부대시설을 이용할 수 있습니다.
-              시설 이용 시 안전수칙을 준수하여야 하며, 시설 손상 시 배상 책임이 있습니다.
-            </p>
-
-            <h4 className="font-medium mb-3">제3조 (회원권 기간 및 환불)</h4>
-            <p className="mb-4">
-              회원권 기간은 등록일로부터 해당 기간만큼 유효합니다.
-              환불은 소비자보호법에 따라 진행되며, 사용기간에 따른 차감 후 환불됩니다.
-            </p>
-
-            <h4 className="font-medium mb-3">제4조 (개인정보 처리)</h4>
-            <p>
-              회사는 회원의 개인정보를 관련 법령에 따라 안전하게 처리하며,
-              서비스 제공 목적 외에는 사용하지 않습니다.
-            </p>
-          </div>
-        </div>
-
-        {/* 개인정보 수집·이용 동의 */}
-        <div className="mb-8">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">개인정보 수집·이용 동의</h3>
-          <div className="bg-gray-50 p-6 rounded-lg text-sm leading-relaxed">
-            <h4 className="font-medium mb-3">수집 목적</h4>
-            <p className="mb-4">회원 관리, 서비스 제공, 계약 이행</p>
-
-            <h4 className="font-medium mb-3">수집 항목</h4>
-            <p className="mb-4">성명, 전화번호, 서명 정보</p>
-
-            <h4 className="font-medium mb-3">보유 기간</h4>
-            <p>회원탈퇴 또는 계약 종료 후 3년간 보관</p>
-          </div>
-        </div>
-
-        {/* 서명란 */}
-        <div className="print-signature">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">동의 및 서명</h3>
-          <p className="text-sm text-gray-700 mb-4">
-            위 약관 및 개인정보 수집·이용에 동의하며 서명합니다.
-          </p>
-
-          <div className="border border-gray-300 rounded-lg p-4 bg-gray-50">
-            <div className="mb-2 text-sm font-medium text-gray-700">고객 서명:</div>
-            <div className="bg-white border border-gray-200 rounded p-4 min-h-[150px] flex items-center justify-center">
-              {contract.signatureData ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={contract.signatureData}
-                  alt="고객 서명"
-                  className="max-h-[120px] max-w-full object-contain"
-                />
-              ) : (
-                <div className="text-gray-400 text-sm">서명 없음</div>
-              )}
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                다음 ▶
+              </button>
             </div>
           </div>
-        </div>
-
-        {/* 하단 정보 */}
-        <div className="mt-12 pt-8 border-t border-gray-300 text-center text-sm text-gray-600">
-          <div className="mb-2">Jamaica Fitness</div>
-          <div>본 계약서는 전자서명법에 의해 법적 효력을 갖습니다.</div>
         </div>
       </div>
+
+      {/* 인쇄용 CSS */}
+      <style jsx global>{`
+        @media print {
+          .no-print {
+            display: none !important;
+          }
+          body {
+            background: white;
+          }
+        }
+      `}</style>
     </div>
   );
 }
