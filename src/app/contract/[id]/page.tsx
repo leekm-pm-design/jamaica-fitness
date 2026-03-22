@@ -1,16 +1,18 @@
 // src/app/contract/[id]/page.tsx
 'use client';
 
+import { use } from 'react';
 import ContractView from '@/components/ContractView';
 
 interface Props {
-  params: {
+  params: Promise<{
     id: string;
-  };
+  }>;
 }
 
 export default function ContractPage({ params }: Props) {
-  const contractId = parseInt(params.id);
+  const { id } = use(params);
+  const contractId = parseInt(id);
 
   if (isNaN(contractId)) {
     return (
