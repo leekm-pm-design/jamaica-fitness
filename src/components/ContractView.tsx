@@ -7,6 +7,7 @@ import { DOCUMENT_CONFIG } from '@/constants/membership';
 interface ContractData {
   id: number;
   signatureData: string;
+  termsSignatureData?: string;
   agreedTerms: boolean;
   contractDate: string;
   customer: {
@@ -128,14 +129,22 @@ export default function ContractView({ contractId }: Props) {
     const pageElements = [];
 
     for (let page = 1; page <= pages; page++) {
-      // 입회신청서 6페이지에 서명이 있으면 서명된 이미지 사용
-      const isSignedPage = docType === 'application' && page === 6 && contract.signatureData;
+      // 입회신청서 6페이지 또는 회원약관 9페이지에 서명이 있으면 서명된 이미지 사용
+      const isApplicationSigned = docType === 'application' && page === 6 && contract.signatureData;
+      const isTermsSigned = docType === 'terms' && page === 9 && contract.termsSignatureData;
+      const isSignedPage = isApplicationSigned || isTermsSigned;
+
+      const imageSource = isApplicationSigned
+        ? contract.signatureData
+        : isTermsSigned
+        ? contract.termsSignatureData
+        : `/img/${prefix}_페이지_${page}.jpg`;
 
       pageElements.push(
         <div key={`${docType}-${page}`} className="print-page">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={isSignedPage ? contract.signatureData : `/img/${prefix}_페이지_${page}.jpg`}
+            src={imageSource}
             alt={`${prefix} ${page}페이지`}
             className="w-full h-auto"
           />
@@ -197,7 +206,7 @@ export default function ContractView({ contractId }: Props) {
                   : 'border-transparent text-gray-500 hover:text-gray-700'
               }`}
             >
-              회원약관 (9페이지)
+              회원약관 (9페이지) {contract.termsSignatureData && '✓'}
             </button>
           </div>
         </div>
@@ -208,12 +217,17 @@ export default function ContractView({ contractId }: Props) {
         <div className="max-w-4xl w-full bg-white shadow-lg rounded-lg overflow-hidden">
           {/* 페이지 이미지 */}
           <div className="relative bg-white">
-            {/* 입회신청서 마지막 페이지이고 서명 데이터가 있으면 서명된 이미지 표시, 아니면 원본 */}
-            {activeDocument === 'application' && currentPage === 6 && contract.signatureData ? (
+            {/* 서명된 페이지 체크 */}
+            {((activeDocument === 'application' && currentPage === 6 && contract.signatureData) ||
+              (activeDocument === 'terms' && currentPage === 9 && contract.termsSignatureData)) ? (
               <>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
-                  src={contract.signatureData}
+                  src={
+                    activeDocument === 'application'
+                      ? contract.signatureData
+                      : contract.termsSignatureData!
+                  }
                   alt={`${DOCUMENT_CONFIG[activeDocument].title} ${currentPage}페이지 (서명됨)`}
                   className="w-full h-auto"
                 />

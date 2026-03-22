@@ -22,13 +22,14 @@ model Customer {
 }
 
 model Contract {
-  id            Int      @id @default(autoincrement())
-  customerId    Int      @map("customer_id")
-  signatureData String   @map("signature_data") @db.Text // Base64 JPEG 문자열
-  pdfUrl        String?  @map("pdf_url") // 서명된 PDF의 Supabase Storage URL
-  agreedTerms   Boolean  @default(true) @map("agreed_terms")
-  contractDate  DateTime @default(now()) @map("contract_date")
-  customer      Customer @relation(fields: [customerId], references: [id])
+  id                    Int      @id @default(autoincrement())
+  customerId            Int      @map("customer_id")
+  signatureData         String   @map("signature_data") @db.Text // 입회신청서 서명 (Base64 JPEG)
+  termsSignatureData    String?  @map("terms_signature_data") @db.Text // 회원약관 서명 (Base64 JPEG)
+  pdfUrl                String?  @map("pdf_url") // 서명된 PDF의 Supabase Storage URL
+  agreedTerms           Boolean  @default(true) @map("agreed_terms")
+  contractDate          DateTime @default(now()) @map("contract_date")
+  customer              Customer @relation(fields: [customerId], references: [id])
 
   @@map("contracts")
 }

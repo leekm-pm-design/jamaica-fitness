@@ -36,6 +36,7 @@ export async function GET(
     return NextResponse.json({
       id: contract.id,
       signatureData: contract.signatureData,
+      termsSignatureData: contract.termsSignatureData,
       agreedTerms: contract.agreedTerms,
       contractDate: contract.contractDate,
       customer: {

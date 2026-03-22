@@ -104,10 +104,13 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 새 계약 생성 (MCP 사용) - 입회신청서 서명을 주 서명으로 사용
-    const contract = await mcp.createContract(customer.id, applicationSignature, agreedTerms, pdfUrl);
+    // 새 계약 생성 (MCP 사용) - 입회신청서 + 회원약관 서명 모두 저장
+    const contract = await mcp.createContract(customer.id, applicationSignature, agreedTerms, pdfUrl, termsSignature);
     console.log('새 계약 생성 (MCP):', contract);
-    console.log('회원약관 서명도 수신됨 (현재는 입회신청서 서명만 저장):', { termsSignatureLength: termsSignature?.length });
+    console.log('두 서명 모두 저장됨:', {
+      applicationSignatureLength: applicationSignature?.length,
+      termsSignatureLength: termsSignature?.length
+    });
 
     if (!contract) {
       throw new Error('계약 생성 실패');

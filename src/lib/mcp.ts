@@ -165,18 +165,32 @@ export class MCPClient {
     return await this.executeSQL(query);
   }
 
-  async createContract(customerId: number, signatureData: string, agreedTerms = true, pdfUrl?: string): Promise<any> {
-    const query = pdfUrl
-      ? `
-        INSERT INTO contracts (customer_id, signature_data, pdf_url, agreed_terms)
-        VALUES (${customerId}, '${signatureData}', '${pdfUrl}', ${agreedTerms})
-        RETURNING *;
-      `
-      : `
-        INSERT INTO contracts (customer_id, signature_data, agreed_terms)
-        VALUES (${customerId}, '${signatureData}', ${agreedTerms})
-        RETURNING *;
-      `;
+  async createContract(customerId: number, signatureData: string, agreedTerms = true, pdfUrl?: string, termsSignatureData?: string): Promise<any> {
+    let query = `
+      INSERT INTO contracts (customer_id, signature_data, agreed_terms`;
+
+    const values = [customerId, signatureData, agreedTerms];
+
+    if (pdfUrl) {
+      query += `, pdf_url`;
+    }
+
+    if (termsSignatureData) {
+      query += `, terms_signature_data`;
+    }
+
+    query += `) VALUES (${customerId}, '${signatureData}', ${agreedTerms}`;
+
+    if (pdfUrl) {
+      query += `, '${pdfUrl}'`;
+    }
+
+    if (termsSignatureData) {
+      query += `, '${termsSignatureData}'`;
+    }
+
+    query += `) RETURNING *;`;
+
     const result = await this.executeSQL(query);
     return result?.[0] || null;
   }
