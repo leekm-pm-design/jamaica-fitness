@@ -220,29 +220,34 @@ export default function PDFSignaturePad({
       return;
     }
 
-    // 서명 페이지 결정 (회원약관=9페이지, 입회신청서=6페이지)
-    const signaturePage = documentType === 'terms' ? 9 : 6;
-    console.log(`[${documentType}] 서명 페이지:`, signaturePage);
+    console.log(`[${documentType}] 전체 ${totalPages}페이지 중 ${allSignatures.size}개 페이지에 서명됨`);
 
-    // 서명 페이지의 배경 이미지 로드
-    const img = new Image();
-    img.src = `/img/${imagePrefix}_페이지_${signaturePage}.jpg`;
+    // 모든 페이지의 이미지 로드
+    const pageImages: HTMLImageElement[] = [];
+    for (let page = 1; page <= totalPages; page++) {
+      const img = new Image();
+      img.src = `/img/${imagePrefix}_페이지_${page}.jpg`;
 
-    try {
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => resolve();
-        img.onerror = () => reject(new Error('이미지 로드 실패'));
-      });
-    } catch (err) {
-      alert('배경 이미지를 로드할 수 없습니다.');
-      setIsSaving(false);
-      return;
+      try {
+        await new Promise<void>((resolve, reject) => {
+          img.onload = () => resolve();
+          img.onerror = () => reject(new Error(`페이지 ${page} 이미지 로드 실패`));
+        });
+        pageImages.push(img);
+      } catch (err) {
+        alert(`페이지 ${page}의 배경 이미지를 로드할 수 없습니다.`);
+        setIsSaving(false);
+        return;
+      }
     }
 
-    // 배경 이미지와 서명을 합친 canvas 생성
+    console.log(`[${documentType}] 전체 ${pageImages.length}개 페이지 이미지 로드 완료`);
+
+    // 모든 페이지를 세로로 이어붙인 큰 캔버스 생성
+    const firstImg = pageImages[0];
     const mergedCanvas = document.createElement('canvas');
-    mergedCanvas.width = img.width;
-    mergedCanvas.height = img.height;
+    mergedCanvas.width = firstImg.width;
+    mergedCanvas.height = firstImg.height * totalPages;
 
     const ctx = mergedCanvas.getContext('2d');
     if (!ctx) {
@@ -251,26 +256,32 @@ export default function PDFSignaturePad({
       return;
     }
 
-    // 1. 배경 이미지 그리기
-    ctx.drawImage(img, 0, 0);
+    // 각 페이지를 순서대로 그리기
+    for (let page = 1; page <= totalPages; page++) {
+      const img = pageImages[page - 1];
+      const yOffset = (page - 1) * img.height;
 
-    // 2. 서명 페이지의 저장된 서명이 있으면 그리기
-    const signaturePageData = allSignatures.get(signaturePage);
-    if (signaturePageData && signaturePageData.length > 0) {
-      console.log(`[${documentType}] 서명 페이지(${signaturePage})의 저장된 서명 사용`);
+      // 1. 배경 이미지 그리기
+      ctx.drawImage(img, 0, yOffset);
 
-      // 임시 캔버스를 만들어서 서명 데이터를 그림
-      const tempCanvas = document.createElement('canvas');
-      tempCanvas.width = img.width;
-      tempCanvas.height = img.height;
-      const tempPad = new SignaturePad(tempCanvas);
-      tempPad.fromData(signaturePageData);
+      // 2. 해당 페이지에 서명이 있으면 그리기
+      const pageSignature = allSignatures.get(page);
+      if (pageSignature && pageSignature.length > 0) {
+        console.log(`[${documentType}] 페이지 ${page}의 서명 추가`);
 
-      // 서명을 메인 캔버스에 그림
-      ctx.drawImage(tempCanvas, 0, 0);
-    } else {
-      console.log(`[${documentType}] 서명 페이지(${signaturePage})에 서명 없음 - 배경만 저장`);
+        // 임시 캔버스에 서명 그리기
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = img.width;
+        tempCanvas.height = img.height;
+        const tempPad = new SignaturePad(tempCanvas);
+        tempPad.fromData(pageSignature);
+
+        // 서명을 해당 위치에 그림
+        ctx.drawImage(tempCanvas, 0, yOffset);
+      }
     }
+
+    console.log(`[${documentType}] 전체 페이지 합성 완료`);
 
     // 3. 합쳐진 이미지를 JPEG로 변환 (품질 0.5로 용량 절감)
     const signatureData = mergedCanvas.toDataURL('image/jpeg', 0.5);
