@@ -159,7 +159,12 @@ export default function PDFSignaturePad({
       // Cleanup
       return () => {
         window.removeEventListener('resize', handleResize);
-        pad.off();
+        try {
+          pad.clear();
+          pad.off();
+        } catch (e) {
+          console.error('SignaturePad cleanup error:', e);
+        }
       };
     }, 100); // 100ms 대기
 
