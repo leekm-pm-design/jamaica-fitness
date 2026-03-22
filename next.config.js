@@ -4,8 +4,6 @@ const nextConfig = {
   experimental: {
     serverComponentsExternalPackages: ['@prisma/client'],
   },
-  // 정적 생성 시 API 라우트 데이터 수집 비활성화
-  outputFileTracing: false,
 }
 
 module.exports = nextConfig
