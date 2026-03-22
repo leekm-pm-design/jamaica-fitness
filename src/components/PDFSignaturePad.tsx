@@ -249,7 +249,7 @@ export default function PDFSignaturePad({
     console.log(`[${documentType}] 전체 ${pageImages.length}개 페이지 이미지 로드 완료`);
 
     // 각 페이지를 개별적으로 저장 (더 효율적)
-    const scaleFactor = 0.3; // 30% 크기로 축소
+    const scaleFactor = 0.5; // 50% 크기로 축소 (더 나은 품질)
     const pageDataMap: { [key: number]: string } = {};
 
     for (let page = 1; page <= totalPages; page++) {
@@ -286,8 +286,8 @@ export default function PDFSignaturePad({
         ctx.drawImage(tempCanvas, 0, 0, pageCanvas.width, pageCanvas.height);
       }
 
-      // 3. 각 페이지를 JPEG로 변환 (품질 0.15)
-      const pageData = pageCanvas.toDataURL('image/jpeg', 0.15);
+      // 3. 각 페이지를 JPEG로 변환 (품질 0.25 - 더 나은 품질)
+      const pageData = pageCanvas.toDataURL('image/jpeg', 0.25);
       pageDataMap[page] = pageData;
       console.log(`[${documentType}] 페이지 ${page} 저장 완료 (${Math.round(pageData.length / 1024)}KB)`);
     }
