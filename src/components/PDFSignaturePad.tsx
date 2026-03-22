@@ -205,13 +205,13 @@ export default function PDFSignaturePad({
 
     console.log(`[${documentType}] 서명 확인 완료, 처리 시작`);
 
-
-    // 현재 페이지의 서명 저장
+    // 현재 페이지의 서명 먼저 저장
+    let allSignatures = new Map(pageSignatures);
     if (currentPageHasSignature) {
       const signatureData = signaturePad.toData();
-      const newMap = new Map(pageSignatures);
-      newMap.set(currentPage, signatureData);
-      onPageSignaturesChange(newMap);
+      allSignatures.set(currentPage, signatureData);
+      onPageSignaturesChange(allSignatures);
+      console.log(`[${documentType}] 현재 페이지(${currentPage}) 서명 저장됨`);
     }
 
     if (!pdfArrayBuffer) {
@@ -220,15 +220,13 @@ export default function PDFSignaturePad({
       return;
     }
 
-    if (!canvasRef.current) {
-      alert('서명 데이터를 처리할 수 없습니다.');
-      setIsSaving(false);
-      return;
-    }
+    // 서명 페이지 결정 (회원약관=9페이지, 입회신청서=6페이지)
+    const signaturePage = documentType === 'terms' ? 9 : 6;
+    console.log(`[${documentType}] 서명 페이지:`, signaturePage);
 
-    // 배경 이미지 로드 (현재 페이지)
+    // 서명 페이지의 배경 이미지 로드
     const img = new Image();
-    img.src = `/img/${imagePrefix}_페이지_${currentPage}.jpg`;
+    img.src = `/img/${imagePrefix}_페이지_${signaturePage}.jpg`;
 
     try {
       await new Promise<void>((resolve, reject) => {
@@ -256,10 +254,22 @@ export default function PDFSignaturePad({
     // 1. 배경 이미지 그리기
     ctx.drawImage(img, 0, 0);
 
-    // 2. 서명 캔버스를 배경 위에 그리기
-    if (signaturePad && !signaturePad.isEmpty()) {
-      const signatureCanvas = canvasRef.current;
-      ctx.drawImage(signatureCanvas, 0, 0, img.width, img.height);
+    // 2. 서명 페이지의 저장된 서명이 있으면 그리기
+    const signaturePageData = allSignatures.get(signaturePage);
+    if (signaturePageData && signaturePageData.length > 0) {
+      console.log(`[${documentType}] 서명 페이지(${signaturePage})의 저장된 서명 사용`);
+
+      // 임시 캔버스를 만들어서 서명 데이터를 그림
+      const tempCanvas = document.createElement('canvas');
+      tempCanvas.width = img.width;
+      tempCanvas.height = img.height;
+      const tempPad = new SignaturePad(tempCanvas);
+      tempPad.fromData(signaturePageData);
+
+      // 서명을 메인 캔버스에 그림
+      ctx.drawImage(tempCanvas, 0, 0);
+    } else {
+      console.log(`[${documentType}] 서명 페이지(${signaturePage})에 서명 없음 - 배경만 저장`);
     }
 
     // 3. 합쳐진 이미지를 JPEG로 변환 (품질 0.5로 용량 절감)
