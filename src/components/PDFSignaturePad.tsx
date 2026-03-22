@@ -289,7 +289,9 @@ export default function PDFSignaturePad({
       signaturePad.clear();
       console.log(`[${documentType}] 페이지 ${currentPage}는 서명 없음`);
     }
-  }, [currentPage, signaturePad, documentType, pageSignatures]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, signaturePad, documentType]);
+  // pageSignatures를 제거하여 서명 저장 시 무한 루프 방지
 
 
   const handlePageChange = (newPage: number) => {
