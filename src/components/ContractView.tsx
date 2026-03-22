@@ -137,14 +137,16 @@ export default function ContractView({ contractId }: Props) {
         isJSON: signedDataString.startsWith('{')
       });
 
-      try {
-        // JSON 파싱하여 페이지별 이미지 추출
-        const pageDataMap = JSON.parse(signedDataString);
-        console.log(`[ContractView] ${prefix} JSON 파싱 성공:`, {
-          totalPages: Object.keys(pageDataMap).length,
-          pages: Object.keys(pageDataMap)
-        });
-        const pageElements = [];
+      // JSON 형태인지 확인 (새로운 방식)
+      if (signedDataString.startsWith('{')) {
+        try {
+          // JSON 파싱하여 페이지별 이미지 추출
+          const pageDataMap = JSON.parse(signedDataString);
+          console.log(`[ContractView] ${prefix} JSON 파싱 성공 (페이지별):`, {
+            totalPages: Object.keys(pageDataMap).length,
+            pages: Object.keys(pageDataMap)
+          });
+          const pageElements = [];
 
         for (let page = 1; page <= pages; page++) {
           const pageImageData = pageDataMap[page];
@@ -174,9 +176,23 @@ export default function ContractView({ contractId }: Props) {
           }
         }
 
-        return pageElements;
-      } catch (e) {
-        console.error('서명 데이터 파싱 오류:', e);
+          return pageElements;
+        } catch (e) {
+          console.error('서명 데이터 파싱 오류:', e);
+        }
+      } else {
+        // 이전 방식 (긴 이미지 하나) - 하위 호환성
+        console.log(`[ContractView] ${prefix} 이전 방식 (긴 이미지) 사용`);
+        return (
+          <div key={`${docType}-signed-legacy`} className="print-long-image">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={signedDataString}
+              alt={`${prefix} (서명됨)`}
+              className="w-full h-auto"
+            />
+          </div>
+        );
       }
     }
 
@@ -268,31 +284,51 @@ export default function ContractView({ contractId }: Props) {
 
               if (signedDataString) {
                 console.log(`[ContractView Screen] ${DOCUMENT_CONFIG[activeDocument].title} 페이지 ${currentPage} 로드 시도`);
-                try {
-                  const pageDataMap = JSON.parse(signedDataString);
-                  const currentPageImage = pageDataMap[currentPage];
-                  console.log(`[ContractView Screen] 페이지 ${currentPage} 데이터:`, {
-                    exists: !!currentPageImage,
-                    imageSize: currentPageImage ? Math.round(currentPageImage.length / 1024) + 'KB' : 'N/A'
-                  });
 
-                  if (currentPageImage) {
-                    return (
-                      <>
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={currentPageImage}
-                          alt={`${DOCUMENT_CONFIG[activeDocument].title} ${currentPage}페이지 (서명됨)`}
-                          className="w-full h-auto"
-                        />
-                        <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded shadow-lg">
-                          ✓ 서명완료
-                        </div>
-                      </>
-                    );
+                // JSON 형태인지 확인 (새로운 방식 - 페이지별)
+                if (signedDataString.startsWith('{')) {
+                  try {
+                    const pageDataMap = JSON.parse(signedDataString);
+                    const currentPageImage = pageDataMap[currentPage];
+                    console.log(`[ContractView Screen] 페이지 ${currentPage} 데이터:`, {
+                      exists: !!currentPageImage,
+                      imageSize: currentPageImage ? Math.round(currentPageImage.length / 1024) + 'KB' : 'N/A'
+                    });
+
+                    if (currentPageImage) {
+                      return (
+                        <>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={currentPageImage}
+                            alt={`${DOCUMENT_CONFIG[activeDocument].title} ${currentPage}페이지 (서명됨)`}
+                            className="w-full h-auto"
+                          />
+                          <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded shadow-lg">
+                            ✓ 서명완료
+                          </div>
+                        </>
+                      );
+                    }
+                  } catch (e) {
+                    console.error('서명 데이터 파싱 오류:', e);
                   }
-                } catch (e) {
-                  console.error('서명 데이터 파싱 오류:', e);
+                } else {
+                  // 이전 방식 (긴 이미지 하나)
+                  console.log(`[ContractView Screen] 이전 방식 (긴 이미지) 사용`);
+                  return (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={signedDataString}
+                        alt={`${DOCUMENT_CONFIG[activeDocument].title} (서명됨)`}
+                        className="w-full h-auto"
+                      />
+                      <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded shadow-lg">
+                        ✓ 서명완료
+                      </div>
+                    </>
+                  );
                 }
               }
 
