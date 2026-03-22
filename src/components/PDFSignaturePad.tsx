@@ -67,8 +67,9 @@ export default function PDFSignaturePad({
     };
   }, [currentPage, imagePrefix, documentType]);
 
-  // 고정된 표준 해상도 (모든 페이지 동일)
+  // 고정된 표준 해상도 (모든 페이지 완전히 동일, A4 비율)
   const STANDARD_WIDTH = 1200;
+  const STANDARD_HEIGHT = 1697; // A4 비율 (210:297 = 1:1.414)
 
   // 서명 패드 초기화 - 배경 이미지 로드 후 실행
   useEffect(() => {
@@ -94,29 +95,26 @@ export default function PDFSignaturePad({
 
       console.log(`SignaturePad 초기화 시작 (페이지 ${currentPage})`);
 
-      // 표준 높이 계산
-      const standardHeight = Math.round((STANDARD_WIDTH / backgroundImage.width) * backgroundImage.height);
-
-      // 캔버스를 표준 크기로 설정 (모든 페이지 동일)
+      // 캔버스를 고정 표준 크기로 설정 (모든 페이지 완전히 동일)
       const resizeCanvas = () => {
         canvas.width = STANDARD_WIDTH;
-        canvas.height = standardHeight;
+        canvas.height = STANDARD_HEIGHT;
 
         // CSS로 화면에 맞춰 표시
         const rect = container.getBoundingClientRect();
         canvas.style.width = `${rect.width}px`;
         canvas.style.height = `${rect.height}px`;
 
-        // 배경 이미지 그리기
+        // 배경 이미지 그리기 (고정 크기에 맞춤)
         const ctx = canvas.getContext('2d');
         if (ctx) {
           ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(backgroundImage, 0, 0, STANDARD_WIDTH, standardHeight);
+          ctx.drawImage(backgroundImage, 0, 0, STANDARD_WIDTH, STANDARD_HEIGHT);
         }
 
-        console.log('Canvas 크기:', {
+        console.log('Canvas 크기 (고정):', {
           canvasWidth: STANDARD_WIDTH,
-          canvasHeight: standardHeight,
+          canvasHeight: STANDARD_HEIGHT,
           displayWidth: rect.width,
           displayHeight: rect.height,
           imageWidth: backgroundImage.width,
@@ -144,7 +142,7 @@ export default function PDFSignaturePad({
         // 배경 이미지를 다시 그린 후 서명 복원
         const ctx = canvas.getContext('2d');
         if (ctx) {
-          ctx.drawImage(backgroundImage, 0, 0, STANDARD_WIDTH, standardHeight);
+          ctx.drawImage(backgroundImage, 0, 0, STANDARD_WIDTH, STANDARD_HEIGHT);
         }
         pad.fromData(data);
       };
@@ -249,13 +247,10 @@ export default function PDFSignaturePad({
     for (let page = 1; page <= totalPages; page++) {
       const img = pageImages[page - 1];
 
-      // 모든 페이지를 동일한 표준 너비로 정규화 (높이는 비율 유지)
-      const standardHeight = Math.round((STANDARD_WIDTH / img.width) * img.height);
-
-      // 페이지별 캔버스 생성 (표준 크기)
+      // 페이지별 캔버스 생성 (모든 페이지 완전히 동일한 고정 크기)
       const pageCanvas = document.createElement('canvas');
       pageCanvas.width = STANDARD_WIDTH;
-      pageCanvas.height = standardHeight;
+      pageCanvas.height = STANDARD_HEIGHT;
 
       const ctx = pageCanvas.getContext('2d');
       if (!ctx) {
@@ -264,36 +259,36 @@ export default function PDFSignaturePad({
         return;
       }
 
-      // 1. 배경 이미지 그리기 (표준 크기로 축소)
-      ctx.drawImage(img, 0, 0, STANDARD_WIDTH, standardHeight);
+      // 1. 배경 이미지 그리기 (고정 크기에 맞춤)
+      ctx.drawImage(img, 0, 0, STANDARD_WIDTH, STANDARD_HEIGHT);
 
       // 2. 해당 페이지에 서명이 있으면 위에 그리기
       const pageSignature = allSignatures.get(page);
       if (pageSignature && pageSignature.length > 0) {
-        console.log(`[${documentType}] 페이지 ${page}의 서명 추가 (표준: ${STANDARD_WIDTH}x${standardHeight})`);
+        console.log(`[${documentType}] 페이지 ${page}의 서명 추가 (고정 크기: ${STANDARD_WIDTH}x${STANDARD_HEIGHT})`);
 
-        // 서명은 이미 표준 크기(1200px) 기준으로 저장되어 있음 - 스케일링 불필요!
-        // 임시 캔버스에 서명 그리기 (표준 크기)
+        // 서명은 이미 고정 표준 크기(1200x1697) 기준으로 저장되어 있음 - 스케일링 불필요!
+        // 임시 캔버스에 서명 그리기 (고정 크기)
         const tempCanvas = document.createElement('canvas');
         tempCanvas.width = STANDARD_WIDTH;
-        tempCanvas.height = standardHeight;
+        tempCanvas.height = STANDARD_HEIGHT;
         const tempPad = new SignaturePad(tempCanvas);
 
         try {
-          // 서명 데이터를 그대로 사용 (이미 1200px 기준)
+          // 서명 데이터를 그대로 사용 (이미 1200x1697 기준)
           tempPad.fromData(pageSignature);
           // 서명을 배경 위에 그림
           ctx.drawImage(tempCanvas, 0, 0);
-          console.log(`[${documentType}] 페이지 ${page} 서명 렌더링 완료 (포인트 수: ${pageSignature.length})`);
+          console.log(`[${documentType}] 페이지 ${page} 서명 렌더링 완료 (스트로크 수: ${pageSignature.length})`);
         } catch (e) {
           console.error(`[${documentType}] 페이지 ${page} 서명 렌더링 실패:`, e);
         }
       }
 
-      // 3. 각 페이지를 JPEG로 변환 (품질 0.3 - 표준 해상도이므로 품질 조금 올림)
-      const pageData = pageCanvas.toDataURL('image/jpeg', 0.3);
+      // 3. 각 페이지를 JPEG로 변환 (품질 0.35 - 고정 해상도)
+      const pageData = pageCanvas.toDataURL('image/jpeg', 0.35);
       pageDataMap[page] = pageData;
-      console.log(`[${documentType}] 페이지 ${page} 저장 완료: ${STANDARD_WIDTH}x${standardHeight} (${Math.round(pageData.length / 1024)}KB)`);
+      console.log(`[${documentType}] 페이지 ${page} 저장 완료: ${STANDARD_WIDTH}x${STANDARD_HEIGHT} (${Math.round(pageData.length / 1024)}KB)`);
     }
 
     console.log(`[${documentType}] 전체 ${totalPages}페이지 개별 저장 완료`);
@@ -329,14 +324,11 @@ export default function PDFSignaturePad({
       const canvas = canvasRef.current;
       if (!canvas || !backgroundImage) return;
 
-      // 표준 높이 계산
-      const standardHeight = Math.round((STANDARD_WIDTH / backgroundImage.width) * backgroundImage.height);
-
-      // 배경 이미지를 먼저 그림
+      // 배경 이미지를 먼저 그림 (고정 크기)
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(backgroundImage, 0, 0, STANDARD_WIDTH, standardHeight);
+        ctx.drawImage(backgroundImage, 0, 0, STANDARD_WIDTH, STANDARD_HEIGHT);
       }
 
       // 저장된 서명이 있으면 복원
