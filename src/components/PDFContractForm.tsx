@@ -151,17 +151,24 @@ export default function PDFContractForm() {
           text: '✅ 계약이 성공적으로 완료되었습니다!'
         });
 
-        // 3초 후 자동 초기화
-        setTimeout(() => {
-          resetForm();
-          setMessage(null);
-        }, 3000);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+
+        // 완료 팝업 표시
+        setMessage(null);
+        alert('🎉 계약이 성공적으로 완료되었습니다!\n\n고객님의 계약서가 저장되었습니다.\n감사합니다.');
+
+        // 폼 초기화
+        resetForm();
       } else {
         const error = await contractResponse.json();
         setMessage({
           type: 'error',
           text: '❌ ' + (error.error || '계약 처리 중 오류가 발생했습니다.')
         });
+
+        // 에러 팝업도 표시
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        alert('❌ 오류가 발생했습니다\n\n' + (error.error || '계약 처리 중 오류가 발생했습니다.') + '\n\n다시 시도해주세요.');
       }
     } catch (error) {
       console.error('계약 처리 오류:', error);
@@ -169,6 +176,11 @@ export default function PDFContractForm() {
         type: 'error',
         text: '❌ 네트워크 오류가 발생했습니다. 다시 시도해주세요.'
       });
+
+      // 네트워크 에러 팝업
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      alert('❌ 네트워크 오류\n\n인터넷 연결을 확인하고 다시 시도해주세요.');
+      setMessage(null);
     } finally {
       setIsSubmitting(false);
     }
@@ -224,14 +236,15 @@ export default function PDFContractForm() {
           </div>
         </div>
 
-        {/* 성공 메시지 */}
+        {/* 진행 상황 메시지 - 최상단에 표시 */}
         {message && (
-          <div className={`fixed top-12 left-1/2 transform -translate-x-1/2 z-50 p-3 rounded-lg text-center text-base font-medium shadow-lg ${
+          <div className={`fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[9999] p-6 rounded-lg text-center text-lg font-bold shadow-2xl border-4 min-w-[300px] ${
             message.type === 'success'
-              ? 'bg-green-100 text-green-800'
-              : 'bg-red-100 text-red-800'
+              ? 'bg-white text-green-700 border-green-500'
+              : 'bg-white text-red-700 border-red-500'
           }`}>
-            {message.text}
+            <div className="text-4xl mb-2">{message.text.split(' ')[0]}</div>
+            <div className="text-base font-medium">{message.text.split(' ').slice(1).join(' ')}</div>
           </div>
         )}
 
