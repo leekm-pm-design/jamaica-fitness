@@ -280,11 +280,9 @@ export default function ContractView({ contractId }: Props) {
       {/* 프린트용 - 모든 페이지 출력 */}
       <div className="print-only">
         <div className="print-section">
-          <h2 className="text-center text-xl font-bold mb-4">입회신청서</h2>
           {renderAllPages('application')}
         </div>
         <div className="print-section page-break">
-          <h2 className="text-center text-xl font-bold mb-4">회원약관</h2>
           {renderAllPages('terms')}
         </div>
       </div>
@@ -340,13 +338,6 @@ export default function ContractView({ contractId }: Props) {
             max-width: 100% !important;
             height: auto !important;
             margin: 0 auto;
-          }
-
-          /* 섹션 제목 */
-          .print-section h2 {
-            margin-bottom: 20px;
-            padding-bottom: 10px;
-            border-bottom: 2px solid #333;
           }
         }
       `}</style>
