@@ -8,5 +8,7 @@ export async function GET() {
     vercelEnv: process.env.VERCEL_ENV || 'local',
     hasDbUrl: !!process.env.DATABASE_URL,
     hasCookieSecret: !!process.env.COOKIE_SECRET,
+    hasAdminPassword: !!process.env.ADMIN_PASSWORD,
+    adminPasswordLength: process.env.ADMIN_PASSWORD?.length || 0,
   });
 }
