@@ -183,26 +183,26 @@ export default function ContractView({ contractId }: Props) {
         <div className="max-w-4xl w-full bg-white shadow-lg rounded-lg overflow-hidden">
           {/* 페이지 이미지 */}
           <div className="relative bg-white">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={`/img/${imagePrefix}_페이지_${currentPage}.jpg`}
-              alt={`${DOCUMENT_CONFIG[activeDocument].title} ${currentPage}페이지`}
-              className="w-full h-auto"
-            />
-
-            {/* 서명이 있고 입회신청서 마지막 페이지인 경우 서명 표시 */}
-            {activeDocument === 'application' && currentPage === 6 && contract.signatureData && (
-              <div className="absolute bottom-0 left-0 right-0 p-4">
-                <div className="bg-white/90 backdrop-blur-sm rounded-lg p-3 shadow-lg">
-                  <div className="text-xs font-medium text-gray-700 mb-2">고객 서명:</div>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={contract.signatureData}
-                    alt="고객 서명"
-                    className="max-h-24 mx-auto"
-                  />
+            {/* 입회신청서 마지막 페이지이고 서명 데이터가 있으면 서명된 이미지 표시, 아니면 원본 */}
+            {activeDocument === 'application' && currentPage === 6 && contract.signatureData ? (
+              <>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={contract.signatureData}
+                  alt={`${DOCUMENT_CONFIG[activeDocument].title} ${currentPage}페이지 (서명됨)`}
+                  className="w-full h-auto"
+                />
+                <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded shadow-lg">
+                  ✓ 서명완료
                 </div>
-              </div>
+              </>
+            ) : (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img
+                src={`/img/${imagePrefix}_페이지_${currentPage}.jpg`}
+                alt={`${DOCUMENT_CONFIG[activeDocument].title} ${currentPage}페이지`}
+                className="w-full h-auto"
+              />
             )}
           </div>
 
