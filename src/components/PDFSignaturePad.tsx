@@ -243,27 +243,27 @@ export default function PDFSignaturePad({
 
     console.log(`[${documentType}] 전체 ${pageImages.length}개 페이지 이미지 로드 완료`);
 
-    // 배경 + 서명을 합친 캔버스 생성 (30% 크기로 축소하여 용량 최소화)
-    const firstImg = pageImages[0];
-    const scaleFactor = 0.3; // 30% 크기로 축소 (더 작게)
-    const mergedCanvas = document.createElement('canvas');
-    mergedCanvas.width = firstImg.width * scaleFactor;
-    mergedCanvas.height = firstImg.height * totalPages * scaleFactor;
+    // 각 페이지를 개별적으로 저장 (더 효율적)
+    const scaleFactor = 0.3; // 30% 크기로 축소
+    const pageDataMap: { [key: number]: string } = {};
 
-    const ctx = mergedCanvas.getContext('2d');
-    if (!ctx) {
-      alert('Canvas 처리 중 오류가 발생했습니다.');
-      setIsSaving(false);
-      return;
-    }
-
-    // 각 페이지의 배경 이미지 + 서명을 함께 그리기
     for (let page = 1; page <= totalPages; page++) {
       const img = pageImages[page - 1];
-      const yOffset = (page - 1) * img.height * scaleFactor;
+
+      // 페이지별 캔버스 생성
+      const pageCanvas = document.createElement('canvas');
+      pageCanvas.width = img.width * scaleFactor;
+      pageCanvas.height = img.height * scaleFactor;
+
+      const ctx = pageCanvas.getContext('2d');
+      if (!ctx) {
+        alert('Canvas 처리 중 오류가 발생했습니다.');
+        setIsSaving(false);
+        return;
+      }
 
       // 1. 배경 이미지 그리기
-      ctx.drawImage(img, 0, yOffset, img.width * scaleFactor, img.height * scaleFactor);
+      ctx.drawImage(img, 0, 0, pageCanvas.width, pageCanvas.height);
 
       // 2. 해당 페이지에 서명이 있으면 위에 그리기
       const pageSignature = allSignatures.get(page);
@@ -278,14 +278,19 @@ export default function PDFSignaturePad({
         tempPad.fromData(pageSignature);
 
         // 서명을 배경 위에 그림 (축소된 크기로)
-        ctx.drawImage(tempCanvas, 0, yOffset, img.width * scaleFactor, img.height * scaleFactor);
+        ctx.drawImage(tempCanvas, 0, 0, pageCanvas.width, pageCanvas.height);
       }
+
+      // 3. 각 페이지를 JPEG로 변환 (품질 0.15)
+      const pageData = pageCanvas.toDataURL('image/jpeg', 0.15);
+      pageDataMap[page] = pageData;
+      console.log(`[${documentType}] 페이지 ${page} 저장 완료 (${Math.round(pageData.length / 1024)}KB)`);
     }
 
-    console.log(`[${documentType}] 전체 페이지 합성 완료 (크기: ${mergedCanvas.width}x${mergedCanvas.height})`);
+    console.log(`[${documentType}] 전체 ${totalPages}페이지 개별 저장 완료`);
 
-    // 3. 합쳐진 이미지를 JPEG로 변환 (품질 0.15 - 더 압축)
-    const signatureData = mergedCanvas.toDataURL('image/jpeg', 0.15);
+    // 4. JSON으로 변환하여 저장
+    const signatureData = JSON.stringify(pageDataMap);
 
     console.log(`[${documentType}] 서명 완료 (배경+서명 합성):`, {
       totalSignedPages: pageSignatures.size,

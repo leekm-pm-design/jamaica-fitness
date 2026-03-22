@@ -127,21 +127,47 @@ export default function ContractView({ contractId }: Props) {
     const prefix = docType === 'application' ? '입회신청서' : '회원약관';
     const pages = DOCUMENT_CONFIG[docType].totalPages;
 
-    // 서명 데이터 확인 (배경 + 서명이 합쳐진 이미지)
-    const signedImage = docType === 'application' ? contract.signatureData : contract.termsSignatureData;
+    // 서명 데이터 확인 (JSON 형태의 페이지별 데이터)
+    const signedDataString = docType === 'application' ? contract.signatureData : contract.termsSignatureData;
 
-    if (signedImage) {
-      // 서명된 이미지가 있으면 그것을 출력
-      return (
-        <div key={`${docType}-signed`} className="print-long-image">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={signedImage}
-            alt={`${prefix} (서명됨)`}
-            className="w-full h-auto"
-          />
-        </div>
-      );
+    if (signedDataString) {
+      try {
+        // JSON 파싱하여 페이지별 이미지 추출
+        const pageDataMap = JSON.parse(signedDataString);
+        const pageElements = [];
+
+        for (let page = 1; page <= pages; page++) {
+          const pageImageData = pageDataMap[page];
+          if (pageImageData) {
+            pageElements.push(
+              <div key={`${docType}-${page}`} className="print-page">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={pageImageData}
+                  alt={`${prefix} ${page}페이지 (서명됨)`}
+                  className="w-full h-auto"
+                />
+              </div>
+            );
+          } else {
+            // 서명이 없는 페이지는 원본 이미지 사용
+            pageElements.push(
+              <div key={`${docType}-${page}`} className="print-page">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={`/img/${prefix}_페이지_${page}.jpg`}
+                  alt={`${prefix} ${page}페이지`}
+                  className="w-full h-auto"
+                />
+              </div>
+            );
+          }
+        }
+
+        return pageElements;
+      } catch (e) {
+        console.error('서명 데이터 파싱 오류:', e);
+      }
     }
 
     // 서명이 없으면 원본 이미지만 사용
@@ -224,77 +250,80 @@ export default function ContractView({ contractId }: Props) {
         <div className="max-w-4xl w-full bg-white shadow-lg rounded-lg overflow-hidden">
           {/* 페이지 이미지 */}
           <div className="relative bg-white max-h-[70vh] overflow-y-auto">
-            {/* 서명 데이터가 있으면 합쳐진 이미지 표시 */}
-            {((activeDocument === 'application' && contract.signatureData) ||
-              (activeDocument === 'terms' && contract.termsSignatureData)) ? (
-              <>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={
-                    activeDocument === 'application'
-                      ? contract.signatureData
-                      : contract.termsSignatureData!
+            {/* 서명 데이터가 있으면 JSON에서 현재 페이지 이미지 표시 */}
+            {(() => {
+              const signedDataString = activeDocument === 'application'
+                ? contract.signatureData
+                : contract.termsSignatureData;
+
+              if (signedDataString) {
+                try {
+                  const pageDataMap = JSON.parse(signedDataString);
+                  const currentPageImage = pageDataMap[currentPage];
+
+                  if (currentPageImage) {
+                    return (
+                      <>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={currentPageImage}
+                          alt={`${DOCUMENT_CONFIG[activeDocument].title} ${currentPage}페이지 (서명됨)`}
+                          className="w-full h-auto"
+                        />
+                        <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded shadow-lg">
+                          ✓ 서명완료
+                        </div>
+                      </>
+                    );
                   }
-                  alt={`${DOCUMENT_CONFIG[activeDocument].title} (서명됨)`}
-                  className="w-full h-auto"
-                />
-                <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded shadow-lg">
-                  ✓ 서명완료
-                </div>
-              </>
-            ) : (
-              /* 서명 없으면 원본 페이지별 표시 */
-              <>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={`/img/${imagePrefix}_페이지_${currentPage}.jpg`}
-                  alt={`${DOCUMENT_CONFIG[activeDocument].title} ${currentPage}페이지`}
-                  className="w-full h-auto"
-                />
-              </>
-            )}
+                } catch (e) {
+                  console.error('서명 데이터 파싱 오류:', e);
+                }
+              }
+
+              // 서명이 없거나 파싱 실패 시 원본 이미지 표시
+              return (
+                <>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={`/img/${imagePrefix}_페이지_${currentPage}.jpg`}
+                    alt={`${DOCUMENT_CONFIG[activeDocument].title} ${currentPage}페이지`}
+                    className="w-full h-auto"
+                  />
+                </>
+              );
+            })()}
           </div>
 
-          {/* 페이지 네비게이션 - 서명 없을 때만 표시 */}
-          {!((activeDocument === 'application' && contract.signatureData) ||
-            (activeDocument === 'terms' && contract.termsSignatureData)) && (
-            <div className="bg-gray-50 border-t p-3">
-              <div className="flex items-center justify-between gap-2">
-                <button
-                  onClick={() => handlePageChange(currentPage - 1)}
-                  disabled={currentPage === 1}
-                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-                >
-                  ◀ 이전
-                </button>
+          {/* 페이지 네비게이션 - 항상 표시 */}
+          <div className="bg-gray-50 border-t p-3">
+            <div className="flex items-center justify-between gap-2">
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                ◀ 이전
+              </button>
 
-                <div className="text-center">
-                  <div className="text-sm font-medium text-gray-700">
-                    {currentPage} / {totalPages}
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    {DOCUMENT_CONFIG[activeDocument].title}
-                  </div>
+              <div className="text-center">
+                <div className="text-sm font-medium text-gray-700">
+                  {currentPage} / {totalPages}
                 </div>
-
-                <button
-                  onClick={() => handlePageChange(currentPage + 1)}
-                  disabled={currentPage === totalPages}
-                  className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-                >
-                  다음 ▶
-                </button>
+                <div className="text-xs text-gray-500">
+                  {DOCUMENT_CONFIG[activeDocument].title}
+                </div>
               </div>
-            </div>
-          )}
 
-          {/* 서명된 경우 스크롤 안내 */}
-          {((activeDocument === 'application' && contract.signatureData) ||
-            (activeDocument === 'terms' && contract.termsSignatureData)) && (
-            <div className="bg-gray-50 border-t p-3 text-center text-sm text-gray-600">
-              ↕ 스크롤하여 전체 페이지를 확인하세요
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
+              >
+                다음 ▶
+              </button>
             </div>
-          )}
+          </div>
         </div>
       </div>
 
