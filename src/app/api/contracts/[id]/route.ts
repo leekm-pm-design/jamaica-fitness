@@ -1,6 +1,6 @@
 // src/app/api/contracts/[id]/route.ts
 import { NextRequest, NextResponse } from 'next/server';
-import { prisma } from '@/lib/prisma';
+import { MCPClient } from '@/lib/mcp';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -19,12 +19,10 @@ export async function GET(
       );
     }
 
-    const contract = await prisma.contract.findUnique({
-      where: { id: contractId },
-      include: {
-        customer: true
-      }
-    });
+    console.log(`GET /api/contracts/${contractId} called (MCP)`);
+
+    const mcp = new MCPClient();
+    const contract = await mcp.getContractById(contractId);
 
     if (!contract) {
       return NextResponse.json(
@@ -33,22 +31,29 @@ export async function GET(
       );
     }
 
+    console.log('계약 조회 성공 (MCP):', {
+      id: contract.id,
+      hasSignature: !!contract.signature_data,
+      hasTermsSignature: !!contract.terms_signature_data,
+      customerName: contract.name
+    });
+
     return NextResponse.json({
       id: contract.id,
-      signatureData: contract.signatureData,
-      termsSignatureData: contract.termsSignatureData,
-      agreedTerms: contract.agreedTerms,
-      contractDate: contract.contractDate,
+      signatureData: contract.signature_data,
+      termsSignatureData: contract.terms_signature_data,
+      agreedTerms: contract.agreed_terms,
+      contractDate: contract.contract_date,
       customer: {
-        name: contract.customer.name,
-        phone: contract.customer.phone,
-        membershipType: contract.customer.membershipType
+        name: contract.name,
+        phone: contract.phone,
+        membershipType: contract.membership_type
       }
     });
   } catch (error) {
-    console.error('계약 조회 오류:', error);
+    console.error('계약 조회 오류 (MCP):', error);
     return NextResponse.json(
-      { error: '서버 오류가 발생했습니다' },
+      { error: '서버 오류가 발생했습니다', details: (error as any)?.message || 'Unknown error' },
       { status: 500 }
     );
   }
