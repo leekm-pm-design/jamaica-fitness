@@ -24,7 +24,7 @@ model Customer {
 model Contract {
   id            Int      @id @default(autoincrement())
   customerId    Int      @map("customer_id")
-  signatureData String   @db.Text // Base64 JPEG 문자열
+  signatureData String   @map("signature_data") @db.Text // Base64 JPEG 문자열
   pdfUrl        String?  @map("pdf_url") // 서명된 PDF의 Supabase Storage URL
   agreedTerms   Boolean  @default(true) @map("agreed_terms")
   contractDate  DateTime @default(now()) @map("contract_date")
