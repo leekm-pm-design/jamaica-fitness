@@ -23,6 +23,7 @@ export default function PDFContractForm() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState<MessageState | null>(null);
   const [showTermsModal, setShowTermsModal] = useState(false);
+  const [initialRenderComplete, setInitialRenderComplete] = useState(false);
 
   // 각 문서별 페이지 서명 데이터
   const [applicationPageSignatures, setApplicationPageSignatures] = useState<Map<number, any>>(new Map());
@@ -56,6 +57,12 @@ export default function PDFContractForm() {
     setStep(2); // 서명 화면으로 이동
     setActiveDocument('terms'); // 회원약관부터 시작
     setMessage(null);
+
+    // 초기 렌더링 완료 후 visibility 적용 (이미지 로딩 대기)
+    setTimeout(() => {
+      setInitialRenderComplete(true);
+      console.log('초기 렌더링 완료 - 비활성 탭 숨김 처리');
+    }, 1500); // 1.5초로 증가
   };
 
   // 회원약관 서명 완료 (먼저)
@@ -256,11 +263,22 @@ export default function PDFContractForm() {
           </div>
         )}
 
-        {/* 문서별 서명 패드 - 조건부 렌더링 */}
-        <div className="flex-1 overflow-hidden">
-          {activeDocument === 'terms' ? (
+        {/* 문서별 서명 패드 - 항상 렌더링, CSS로 제어 */}
+        <div className="flex-1 relative" style={{ overflow: 'hidden' }}>
+          {/* 회원약관 - 항상 렌더링 */}
+          <div
+            style={{
+              position: !initialRenderComplete ? 'relative' : 'absolute',
+              top: 0,
+              left: 0,
+              height: '100%',
+              width: '100%',
+              zIndex: activeDocument === 'terms' ? 10 : 1,
+              pointerEvents: activeDocument === 'terms' ? 'auto' : 'none',
+              visibility: !initialRenderComplete || activeDocument === 'terms' ? 'visible' : 'hidden'
+            }}
+          >
             <PDFSignaturePad
-              key="terms"
               pdfUrl="/회원약관.pdf"
               documentType="terms"
               totalPages={9}
@@ -270,10 +288,23 @@ export default function PDFContractForm() {
               onCurrentPageChange={setTermsCurrentPage}
               onSignatureComplete={handleTermsComplete}
               onBack={handleBackToForm}
+              isActive={activeDocument === 'terms'}
             />
-          ) : (
+          </div>
+          {/* 입회신청서 - 항상 렌더링 */}
+          <div
+            style={{
+              position: !initialRenderComplete ? 'relative' : 'absolute',
+              top: 0,
+              left: 0,
+              height: '100%',
+              width: '100%',
+              zIndex: activeDocument === 'application' ? 10 : 1,
+              pointerEvents: activeDocument === 'application' ? 'auto' : 'none',
+              visibility: !initialRenderComplete || activeDocument === 'application' ? 'visible' : 'hidden'
+            }}
+          >
             <PDFSignaturePad
-              key="application"
               pdfUrl="/입회신청서.pdf"
               documentType="application"
               totalPages={6}
@@ -283,8 +314,9 @@ export default function PDFContractForm() {
               onCurrentPageChange={setApplicationCurrentPage}
               onSignatureComplete={handleApplicationComplete}
               onBack={handleBackToForm}
+              isActive={activeDocument === 'application'}
             />
-          )}
+          </div>
         </div>
       </div>
     );

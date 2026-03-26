@@ -15,6 +15,8 @@ interface PDFSignaturePadProps {
   onSignatureComplete: (signatureData: string, pdfData: ArrayBuffer) => void;
   onClear?: () => void;
   onBack?: () => void;
+  isActive?: boolean; // 활성 탭 여부
+  onBackgroundReady?: () => void; // 배경 이미지 준비 완료 콜백
 }
 
 export default function PDFSignaturePad({
@@ -27,9 +29,12 @@ export default function PDFSignaturePad({
   onCurrentPageChange,
   onSignatureComplete,
   onClear,
-  onBack
+  onBack,
+  isActive = true,
+  onBackgroundReady
 }: PDFSignaturePadProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const backgroundCanvasRef = useRef<HTMLCanvasElement>(null); // 배경 전용 캔버스
   const containerRef = useRef<HTMLDivElement>(null);
   const [signaturePad, setSignaturePad] = useState<SignaturePad | null>(null);
   const [pdfArrayBuffer, setPdfArrayBuffer] = useState<ArrayBuffer | null>(null);
@@ -40,30 +45,39 @@ export default function PDFSignaturePad({
   // 문서 타입에 따른 이미지 파일명 prefix
   const imagePrefix = documentType === 'application' ? '입회신청서' : '회원약관';
 
-  // PDF를 ArrayBuffer로 로드
+  // PDF를 ArrayBuffer로 로드 (이미지만 사용하므로 즉시 완료 처리)
   useEffect(() => {
-    fetch(pdfUrl)
-      .then(res => res.arrayBuffer())
-      .then(buffer => {
-        setPdfArrayBuffer(buffer);
-        setIsLoading(false);
-      })
-      .catch(err => {
-        console.error('PDF 로드 실패:', err);
-        setIsLoading(false);
-      });
-  }, [pdfUrl]);
+    // PDF는 사용하지 않고 이미지만 사용
+    setIsLoading(false);
+    console.log(`[${documentType}] 초기화 시작 (이미지 모드)`);
+  }, [documentType]);
 
   // 현재 페이지의 배경 이미지 로드
   useEffect(() => {
+    console.log(`[${documentType}] 이미지 로드 시도: /img/${imagePrefix}_페이지_${currentPage}.jpg`);
     const img = new Image();
+    img.crossOrigin = 'anonymous';
     img.src = `/img/${imagePrefix}_페이지_${currentPage}.jpg`;
+
     img.onload = () => {
-      console.log(`[${documentType}] 페이지 ${currentPage} 이미지 로드 완료`);
+      console.log(`[${documentType}] 페이지 ${currentPage} 이미지 로드 완료`, {
+        width: img.width,
+        height: img.height,
+        src: img.src
+      });
       setBackgroundImage(img);
     };
+
     img.onerror = (err) => {
-      console.error(`[${documentType}] 페이지 ${currentPage} 이미지 로드 실패:`, err);
+      console.error(`[${documentType}] 페이지 ${currentPage} 이미지 로드 실패:`, {
+        src: img.src,
+        error: err
+      });
+    };
+
+    return () => {
+      img.onload = null;
+      img.onerror = null;
     };
   }, [currentPage, imagePrefix, documentType]);
 
@@ -71,14 +85,75 @@ export default function PDFSignaturePad({
   const STANDARD_WIDTH = 1200;
   const STANDARD_HEIGHT = 1697; // A4 비율 (210:297 = 1:1.414)
 
-  // 서명 패드 초기화 - 배경 이미지 로드 후 실행
+  // 배경 캔버스에 이미지 그리기 - isActive가 true가 될 때도 다시 그림
   useEffect(() => {
-    if (isLoading || !canvasRef.current || !containerRef.current || !backgroundImage) {
+    const bgCanvas = backgroundCanvasRef.current;
+
+    if (!bgCanvas || !backgroundImage) {
+      console.log(`[${documentType}] 배경 캔버스 대기 중:`, {
+        hasCanvas: !!bgCanvas,
+        hasImage: !!backgroundImage,
+        isActive,
+        imageComplete: backgroundImage?.complete,
+        imageSrc: backgroundImage?.src
+      });
+      return;
+    }
+
+    const drawBackground = () => {
+      console.log(`[${documentType}] 배경 그리기 시도 (페이지 ${currentPage})`);
+
+      const ctx = bgCanvas.getContext('2d');
+      if (!ctx) {
+        console.error(`[${documentType}] Canvas context를 가져올 수 없음`);
+        return;
+      }
+
+      // 배경 캔버스 크기 설정 (내부 해상도)
+      bgCanvas.width = STANDARD_WIDTH;
+      bgCanvas.height = STANDARD_HEIGHT;
+
+      // 배경색으로 먼저 채우기 (테스트용)
+      ctx.fillStyle = '#f0f0f0';
+      ctx.fillRect(0, 0, STANDARD_WIDTH, STANDARD_HEIGHT);
+
+      // 배경 이미지 그리기
+      try {
+        ctx.drawImage(backgroundImage, 0, 0, STANDARD_WIDTH, STANDARD_HEIGHT);
+        console.log(`[${documentType}] ✅ 배경 이미지 그려짐 (페이지 ${currentPage}):`, {
+          canvasWidth: bgCanvas.width,
+          canvasHeight: bgCanvas.height,
+          imageWidth: backgroundImage.width,
+          imageHeight: backgroundImage.height,
+          imageComplete: backgroundImage.complete,
+          isActive
+        });
+      } catch (err) {
+        console.error(`[${documentType}] ❌ 이미지 그리기 실패:`, err);
+      }
+    };
+
+    // 이미지가 완전히 로드되었으면 즉시 그리기
+    if (backgroundImage.complete && backgroundImage.naturalWidth > 0) {
+      const timer = setTimeout(drawBackground, 50);
+      return () => clearTimeout(timer);
+    } else {
+      // 아직 로드 중이면 로드 완료 대기
+      console.log(`[${documentType}] 이미지 로드 대기 중...`);
+      backgroundImage.onload = drawBackground;
+      return () => {
+        backgroundImage.onload = null;
+      };
+    }
+  }, [backgroundImage, currentPage, documentType, isActive]); // isActive 추가
+
+  // 서명 패드 초기화
+  useEffect(() => {
+    if (isLoading || !canvasRef.current || !containerRef.current) {
       console.log('Canvas 초기화 대기 중...', {
         isLoading,
         hasCanvas: !!canvasRef.current,
-        hasContainer: !!containerRef.current,
-        hasBackground: !!backgroundImage
+        hasContainer: !!containerRef.current
       });
       return;
     }
@@ -88,41 +163,21 @@ export default function PDFSignaturePad({
       const canvas = canvasRef.current;
       const container = containerRef.current;
 
-      if (!canvas || !container || !backgroundImage) {
-        console.log('Canvas, Container 또는 배경 이미지가 없습니다');
+      if (!canvas || !container) {
+        console.log('Canvas 또는 Container가 없습니다');
         return;
       }
 
       console.log(`SignaturePad 초기화 시작 (페이지 ${currentPage})`);
 
-      // 캔버스를 고정 표준 크기로 설정 (모든 페이지 완전히 동일)
-      const resizeCanvas = () => {
-        canvas.width = STANDARD_WIDTH;
-        canvas.height = STANDARD_HEIGHT;
+      // 서명 캔버스를 고정 표준 크기로 설정
+      canvas.width = STANDARD_WIDTH;
+      canvas.height = STANDARD_HEIGHT;
 
-        // CSS로 화면에 맞춰 표시
-        const rect = container.getBoundingClientRect();
-        canvas.style.width = `${rect.width}px`;
-        canvas.style.height = `${rect.height}px`;
-
-        // 배경 이미지 그리기 (고정 크기에 맞춤)
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.clearRect(0, 0, canvas.width, canvas.height);
-          ctx.drawImage(backgroundImage, 0, 0, STANDARD_WIDTH, STANDARD_HEIGHT);
-        }
-
-        console.log('Canvas 크기 (고정):', {
-          canvasWidth: STANDARD_WIDTH,
-          canvasHeight: STANDARD_HEIGHT,
-          displayWidth: rect.width,
-          displayHeight: rect.height,
-          imageWidth: backgroundImage.width,
-          imageHeight: backgroundImage.height
-        });
-      };
-
-      resizeCanvas();
+      console.log('서명 Canvas 크기 (고정):', {
+        canvasWidth: STANDARD_WIDTH,
+        canvasHeight: STANDARD_HEIGHT
+      });
 
       const pad = new SignaturePad(canvas, {
         backgroundColor: 'rgba(0, 0, 0, 0)', // 투명 배경
@@ -137,13 +192,8 @@ export default function PDFSignaturePad({
       // 윈도우 리사이즈 핸들러
       const handleResize = () => {
         const data = pad.toData();
-        resizeCanvas();
+        // 캔버스 내부 해상도는 유지 (CSS만 변경됨)
         pad.clear();
-        // 배경 이미지를 다시 그린 후 서명 복원
-        const ctx = canvas.getContext('2d');
-        if (ctx) {
-          ctx.drawImage(backgroundImage, 0, 0, STANDARD_WIDTH, STANDARD_HEIGHT);
-        }
         pad.fromData(data);
       };
 
@@ -162,7 +212,7 @@ export default function PDFSignaturePad({
     }, 100); // 100ms 대기
 
     return () => clearTimeout(timer);
-  }, [isLoading, backgroundImage, currentPage]);
+  }, [isLoading, currentPage, backgroundImage]);
 
   const handleClear = () => {
     if (!signaturePad) return;
@@ -210,12 +260,6 @@ export default function PDFSignaturePad({
       allSignatures.set(currentPage, signatureData);
       onPageSignaturesChange(allSignatures);
       console.log(`[${documentType}] 현재 페이지(${currentPage}) 서명 저장됨`);
-    }
-
-    if (!pdfArrayBuffer) {
-      alert('PDF를 로딩 중입니다. 잠시 후 다시 시도해주세요.');
-      setIsSaving(false);
-      return;
     }
 
     console.log(`[${documentType}] 전체 ${totalPages}페이지 중 ${allSignatures.size}개 페이지에 서명됨`);
@@ -309,28 +353,20 @@ export default function PDFSignaturePad({
       alert(`경고: 데이터 크기가 ${dataSizeMB}MB입니다. 저장에 실패할 수 있습니다.`);
     }
 
-    onSignatureComplete(signatureData, pdfArrayBuffer);
+    // PDF 대신 빈 ArrayBuffer 전달 (사용하지 않음)
+    const emptyBuffer = new ArrayBuffer(0);
+    onSignatureComplete(signatureData, emptyBuffer);
     setIsSaving(false);
   };
 
   // 페이지 변경 시 서명 불러오기
   useEffect(() => {
-    if (!signaturePad || !currentPage || !backgroundImage || !canvasRef.current) return;
+    if (!signaturePad || !currentPage) return;
 
     console.log(`[${documentType}] 페이지 ${currentPage}로 전환 - 서명 로드 시도`);
 
     // 약간의 지연을 두어 state 업데이트가 완료되도록 함
     const timer = setTimeout(() => {
-      const canvas = canvasRef.current;
-      if (!canvas || !backgroundImage) return;
-
-      // 배경 이미지를 먼저 그림 (고정 크기)
-      const ctx = canvas.getContext('2d');
-      if (ctx) {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(backgroundImage, 0, 0, STANDARD_WIDTH, STANDARD_HEIGHT);
-      }
-
       // 저장된 서명이 있으면 복원
       const savedSignature = pageSignatures.get(currentPage);
       if (savedSignature && savedSignature.length > 0) {
@@ -345,7 +381,7 @@ export default function PDFSignaturePad({
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPage, signaturePad, documentType, backgroundImage]);
+  }, [currentPage, signaturePad, documentType]);
   // pageSignatures는 의도적으로 제외하여 무한 루프 방지
 
 
@@ -369,6 +405,12 @@ export default function PDFSignaturePad({
       // 페이지 변경
       onCurrentPageChange(newPage);
       console.log(`[${documentType}] 페이지 변경됨:`, newPage);
+
+      // 스크롤을 맨 위로 이동
+      if (containerRef.current) {
+        containerRef.current.scrollTop = 0;
+        console.log(`[${documentType}] 스크롤을 맨 위로 이동`);
+      }
     } else {
       console.log(`[${documentType}] 페이지 범위 초과:`, newPage);
     }
@@ -389,20 +431,35 @@ export default function PDFSignaturePad({
       {/* 이미지 뷰어 + 서명 오버레이 - 전체화면 */}
       <div
         ref={containerRef}
-        className="flex-1 relative bg-gray-100 overflow-hidden flex items-center justify-center"
+        className="flex-1 relative bg-gray-100"
+        style={{ overflow: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}
       >
-        {/* 서명 캔버스 (배경 이미지 포함) */}
-        <canvas
-          ref={canvasRef}
-          className="cursor-crosshair"
-          style={{
-            touchAction: 'none',
-            pointerEvents: 'auto',
-            maxWidth: '100%',
-            maxHeight: '100%',
-            objectFit: 'contain'
-          }}
-        />
+        {/* 캔버스 래퍼 - 두 캔버스를 정확히 같은 위치에 배치 */}
+        <div style={{ position: 'relative', display: 'inline-block', maxWidth: '100%', maxHeight: '100%' }}>
+          {/* 배경 캔버스 (PDF 이미지) */}
+          <canvas
+            ref={backgroundCanvasRef}
+            style={{
+              display: 'block',
+              maxWidth: '100%',
+              maxHeight: '100%',
+              pointerEvents: 'none',
+              border: '2px solid red' // 디버깅용: 캔버스 위치 확인
+            }}
+          />
+          {/* 서명 캔버스 (투명, 서명만) - 배경 위에 정확히 겹침 */}
+          <canvas
+            ref={canvasRef}
+            className="cursor-crosshair"
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              touchAction: 'none',
+              pointerEvents: 'auto'
+            }}
+          />
+        </div>
       </div>
 
       {/* 하단 컨트롤 바 */}
