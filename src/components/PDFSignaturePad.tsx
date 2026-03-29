@@ -55,29 +55,60 @@ export default function PDFSignaturePad({
   // 현재 페이지의 배경 이미지 로드
   useEffect(() => {
     console.log(`[${documentType}] 이미지 로드 시도: /img/${imagePrefix}_페이지_${currentPage}.jpg`);
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.src = `/img/${imagePrefix}_페이지_${currentPage}.jpg`;
 
-    img.onload = () => {
-      console.log(`[${documentType}] 페이지 ${currentPage} 이미지 로드 완료`, {
-        width: img.width,
-        height: img.height,
-        src: img.src
-      });
-      setBackgroundImage(img);
+    let mounted = true;
+    let retryCount = 0;
+    const maxRetries = 3;
+
+    const loadImage = () => {
+      const img = new Image();
+      // 모바일에서 crossOrigin 이슈 방지 - 같은 도메인이므로 제거
+      // img.crossOrigin = 'anonymous';
+
+      const imagePath = `/img/${imagePrefix}_페이지_${currentPage}.jpg`;
+
+      img.onload = () => {
+        if (!mounted) return;
+
+        console.log(`[${documentType}] 페이지 ${currentPage} 이미지 로드 완료`, {
+          width: img.width,
+          height: img.height,
+          src: img.src,
+          complete: img.complete,
+          naturalWidth: img.naturalWidth
+        });
+        setBackgroundImage(img);
+      };
+
+      img.onerror = (err) => {
+        if (!mounted) return;
+
+        console.error(`[${documentType}] 페이지 ${currentPage} 이미지 로드 실패 (시도 ${retryCount + 1}/${maxRetries}):`, {
+          src: imagePath,
+          error: err
+        });
+
+        // 재시도
+        if (retryCount < maxRetries) {
+          retryCount++;
+          console.log(`[${documentType}] 이미지 로드 재시도 중... (${retryCount}/${maxRetries})`);
+          setTimeout(() => {
+            if (mounted) loadImage();
+          }, 500 * retryCount); // 점진적 지연
+        } else {
+          console.error(`[${documentType}] 이미지 로드 최종 실패`);
+          alert(`페이지 ${currentPage}의 이미지를 불러올 수 없습니다. 네트워크를 확인해주세요.`);
+        }
+      };
+
+      // src 설정 (캐시 방지를 위해 타임스탬프 추가하지 않음 - 같은 이미지 재사용)
+      img.src = imagePath;
     };
 
-    img.onerror = (err) => {
-      console.error(`[${documentType}] 페이지 ${currentPage} 이미지 로드 실패:`, {
-        src: img.src,
-        error: err
-      });
-    };
+    loadImage();
 
     return () => {
-      img.onload = null;
-      img.onerror = null;
+      mounted = false;
     };
   }, [currentPage, imagePrefix, documentType]);
 
@@ -103,18 +134,20 @@ export default function PDFSignaturePad({
     const drawBackground = () => {
       console.log(`[${documentType}] 배경 그리기 시도 (페이지 ${currentPage})`);
 
-      const ctx = bgCanvas.getContext('2d');
+      const ctx = bgCanvas.getContext('2d', { willReadFrequently: false });
       if (!ctx) {
         console.error(`[${documentType}] Canvas context를 가져올 수 없음`);
         return;
       }
 
-      // 배경 캔버스 크기 설정 (내부 해상도)
-      bgCanvas.width = STANDARD_WIDTH;
-      bgCanvas.height = STANDARD_HEIGHT;
+      // 배경 캔버스 크기 설정 (내부 해상도) - 한 번만 설정
+      if (bgCanvas.width !== STANDARD_WIDTH || bgCanvas.height !== STANDARD_HEIGHT) {
+        bgCanvas.width = STANDARD_WIDTH;
+        bgCanvas.height = STANDARD_HEIGHT;
+      }
 
-      // 배경색으로 먼저 채우기 (테스트용)
-      ctx.fillStyle = '#f0f0f0';
+      // 배경색으로 먼저 채우기
+      ctx.fillStyle = '#ffffff';
       ctx.fillRect(0, 0, STANDARD_WIDTH, STANDARD_HEIGHT);
 
       // 배경 이미지 그리기
@@ -128,6 +161,11 @@ export default function PDFSignaturePad({
           imageComplete: backgroundImage.complete,
           isActive
         });
+
+        // 배경 그리기 완료 콜백 호출
+        if (onBackgroundReady) {
+          onBackgroundReady();
+        }
       } catch (err) {
         console.error(`[${documentType}] ❌ 이미지 그리기 실패:`, err);
       }
@@ -135,30 +173,46 @@ export default function PDFSignaturePad({
 
     // 이미지가 완전히 로드되었으면 즉시 그리기
     if (backgroundImage.complete && backgroundImage.naturalWidth > 0) {
-      const timer = setTimeout(drawBackground, 50);
-      return () => clearTimeout(timer);
+      // requestAnimationFrame을 사용하여 렌더링 보장
+      requestAnimationFrame(() => {
+        drawBackground();
+      });
     } else {
       // 아직 로드 중이면 로드 완료 대기
       console.log(`[${documentType}] 이미지 로드 대기 중...`);
-      backgroundImage.onload = drawBackground;
+      backgroundImage.onload = () => {
+        requestAnimationFrame(drawBackground);
+      };
       return () => {
         backgroundImage.onload = null;
       };
     }
-  }, [backgroundImage, currentPage, documentType, isActive]); // isActive 추가
+  }, [backgroundImage, currentPage, documentType, isActive, onBackgroundReady]); // isActive 추가
 
   // 서명 패드 초기화
   useEffect(() => {
-    if (isLoading || !canvasRef.current || !containerRef.current) {
+    if (isLoading || !canvasRef.current || !containerRef.current || !backgroundImage) {
       console.log('Canvas 초기화 대기 중...', {
         isLoading,
         hasCanvas: !!canvasRef.current,
-        hasContainer: !!containerRef.current
+        hasContainer: !!containerRef.current,
+        hasBackgroundImage: !!backgroundImage
       });
       return;
     }
 
-    // DOM이 완전히 렌더링될 때까지 약간 대기
+    // SignaturePad가 이미 존재하면 정리
+    if (signaturePad) {
+      console.log(`[${documentType}] 기존 SignaturePad 정리`);
+      try {
+        signaturePad.clear();
+        signaturePad.off();
+      } catch (e) {
+        console.error('SignaturePad cleanup error:', e);
+      }
+    }
+
+    // 배경이 그려질 때까지 대기한 후 SignaturePad 초기화
     const timer = setTimeout(() => {
       const canvas = canvasRef.current;
       const container = containerRef.current;
@@ -168,11 +222,13 @@ export default function PDFSignaturePad({
         return;
       }
 
-      console.log(`SignaturePad 초기화 시작 (페이지 ${currentPage})`);
+      console.log(`[${documentType}] SignaturePad 초기화 시작 (페이지 ${currentPage})`);
 
-      // 서명 캔버스를 고정 표준 크기로 설정
-      canvas.width = STANDARD_WIDTH;
-      canvas.height = STANDARD_HEIGHT;
+      // 서명 캔버스를 고정 표준 크기로 설정 (한 번만)
+      if (canvas.width !== STANDARD_WIDTH || canvas.height !== STANDARD_HEIGHT) {
+        canvas.width = STANDARD_WIDTH;
+        canvas.height = STANDARD_HEIGHT;
+      }
 
       console.log('서명 Canvas 크기 (고정):', {
         canvasWidth: STANDARD_WIDTH,
@@ -184,35 +240,16 @@ export default function PDFSignaturePad({
         penColor: 'rgb(0, 0, 0)', // 검은색 서명
         minWidth: 2,
         maxWidth: 4,
+        throttle: 16, // 60fps로 제한
+        velocityFilterWeight: 0.7
       });
 
-      console.log('SignaturePad 생성 완료:', pad);
+      console.log(`[${documentType}] SignaturePad 생성 완료`);
       setSignaturePad(pad);
-
-      // 윈도우 리사이즈 핸들러
-      const handleResize = () => {
-        const data = pad.toData();
-        // 캔버스 내부 해상도는 유지 (CSS만 변경됨)
-        pad.clear();
-        pad.fromData(data);
-      };
-
-      window.addEventListener('resize', handleResize);
-
-      // Cleanup
-      return () => {
-        window.removeEventListener('resize', handleResize);
-        try {
-          pad.clear();
-          pad.off();
-        } catch (e) {
-          console.error('SignaturePad cleanup error:', e);
-        }
-      };
-    }, 100); // 100ms 대기
+    }, 200); // 배경이 그려질 시간 확보
 
     return () => clearTimeout(timer);
-  }, [isLoading, currentPage, backgroundImage]);
+  }, [isLoading, currentPage, backgroundImage, documentType]);
 
   const handleClear = () => {
     if (!signaturePad) return;
@@ -435,7 +472,14 @@ export default function PDFSignaturePad({
         style={{ overflow: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}
       >
         {/* 캔버스 래퍼 - 두 캔버스를 정확히 같은 위치에 배치 */}
-        <div style={{ position: 'relative', display: 'inline-block', maxWidth: '100%', maxHeight: '100%' }}>
+        <div style={{
+          position: 'relative',
+          display: 'inline-block',
+          maxWidth: '100%',
+          maxHeight: '100%',
+          width: 'auto',
+          height: 'auto'
+        }}>
           {/* 배경 캔버스 (PDF 이미지) */}
           <canvas
             ref={backgroundCanvasRef}
@@ -443,8 +487,10 @@ export default function PDFSignaturePad({
               display: 'block',
               maxWidth: '100%',
               maxHeight: '100%',
+              width: 'auto',
+              height: 'auto',
               pointerEvents: 'none',
-              border: '2px solid red' // 디버깅용: 캔버스 위치 확인
+              imageRendering: 'auto'
             }}
           />
           {/* 서명 캔버스 (투명, 서명만) - 배경 위에 정확히 겹침 */}
@@ -455,6 +501,8 @@ export default function PDFSignaturePad({
               position: 'absolute',
               top: 0,
               left: 0,
+              width: '100%',
+              height: '100%',
               touchAction: 'none',
               pointerEvents: 'auto'
             }}
