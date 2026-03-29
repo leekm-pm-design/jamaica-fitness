@@ -264,18 +264,18 @@ export default function PDFContractForm() {
         )}
 
         {/* 문서별 서명 패드 - 항상 렌더링, CSS로 제어 */}
-        <div className="flex-1 relative" style={{ overflow: 'hidden' }}>
+        <div className="flex-1 relative">
           {/* 회원약관 - 항상 렌더링 */}
           <div
             style={{
-              position: !initialRenderComplete ? 'relative' : 'absolute',
+              position: 'absolute',
               top: 0,
               left: 0,
               height: '100%',
               width: '100%',
               zIndex: activeDocument === 'terms' ? 10 : 1,
               pointerEvents: activeDocument === 'terms' ? 'auto' : 'none',
-              visibility: !initialRenderComplete || activeDocument === 'terms' ? 'visible' : 'hidden'
+              display: activeDocument === 'terms' ? 'flex' : 'none'
             }}
           >
             <PDFSignaturePad
@@ -294,14 +294,14 @@ export default function PDFContractForm() {
           {/* 입회신청서 - 항상 렌더링 */}
           <div
             style={{
-              position: !initialRenderComplete ? 'relative' : 'absolute',
+              position: 'absolute',
               top: 0,
               left: 0,
               height: '100%',
               width: '100%',
               zIndex: activeDocument === 'application' ? 10 : 1,
               pointerEvents: activeDocument === 'application' ? 'auto' : 'none',
-              visibility: !initialRenderComplete || activeDocument === 'application' ? 'visible' : 'hidden'
+              display: activeDocument === 'application' ? 'flex' : 'none'
             }}
           >
             <PDFSignaturePad

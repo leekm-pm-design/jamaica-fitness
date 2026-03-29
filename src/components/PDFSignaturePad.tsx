@@ -215,24 +215,30 @@ export default function PDFSignaturePad({
     // 배경이 그려질 때까지 대기한 후 SignaturePad 초기화
     const timer = setTimeout(() => {
       const canvas = canvasRef.current;
+      const bgCanvas = backgroundCanvasRef.current;
       const container = containerRef.current;
 
-      if (!canvas || !container) {
+      if (!canvas || !bgCanvas || !container) {
         console.log('Canvas 또는 Container가 없습니다');
         return;
       }
 
       console.log(`[${documentType}] SignaturePad 초기화 시작 (페이지 ${currentPage})`);
 
-      // 서명 캔버스를 고정 표준 크기로 설정 (한 번만)
-      if (canvas.width !== STANDARD_WIDTH || canvas.height !== STANDARD_HEIGHT) {
-        canvas.width = STANDARD_WIDTH;
-        canvas.height = STANDARD_HEIGHT;
-      }
+      // 배경 캔버스의 실제 표시 크기 가져오기
+      const bgRect = bgCanvas.getBoundingClientRect();
 
-      console.log('서명 Canvas 크기 (고정):', {
-        canvasWidth: STANDARD_WIDTH,
-        canvasHeight: STANDARD_HEIGHT
+      // 서명 캔버스의 내부 해상도를 고정 크기로 설정
+      canvas.width = STANDARD_WIDTH;
+      canvas.height = STANDARD_HEIGHT;
+
+      console.log('서명 Canvas 크기:', {
+        internalWidth: STANDARD_WIDTH,
+        internalHeight: STANDARD_HEIGHT,
+        bgCssWidth: bgRect.width,
+        bgCssHeight: bgRect.height,
+        scaleX: STANDARD_WIDTH / bgRect.width,
+        scaleY: STANDARD_HEIGHT / bgRect.height
       });
 
       const pad = new SignaturePad(canvas, {
@@ -244,8 +250,40 @@ export default function PDFSignaturePad({
         velocityFilterWeight: 0.7
       });
 
+      // 리사이즈 이벤트 핸들러 추가
+      const handleResize = () => {
+        if (!canvas || !bgCanvas || !pad) return;
+
+        const newBgRect = bgCanvas.getBoundingClientRect();
+
+        console.log(`[${documentType}] 리사이즈 감지:`, {
+          oldWidth: bgRect.width,
+          newWidth: newBgRect.width
+        });
+
+        // 서명 데이터 임시 저장
+        const data = pad.toData();
+
+        // 캔버스 내부 해상도 재설정 (필요시)
+        if (canvas.width !== STANDARD_WIDTH || canvas.height !== STANDARD_HEIGHT) {
+          canvas.width = STANDARD_WIDTH;
+          canvas.height = STANDARD_HEIGHT;
+        }
+
+        // 서명 복원
+        pad.clear();
+        pad.fromData(data);
+      };
+
+      window.addEventListener('resize', handleResize);
+
       console.log(`[${documentType}] SignaturePad 생성 완료`);
       setSignaturePad(pad);
+
+      // Cleanup 함수에서 리사이즈 리스너 제거
+      return () => {
+        window.removeEventListener('resize', handleResize);
+      };
     }, 200); // 배경이 그려질 시간 확보
 
     return () => clearTimeout(timer);
@@ -468,26 +506,27 @@ export default function PDFSignaturePad({
       {/* 이미지 뷰어 + 서명 오버레이 - 전체화면 */}
       <div
         ref={containerRef}
-        className="flex-1 relative bg-gray-100"
-        style={{ overflow: 'auto', display: 'flex', justifyContent: 'center', alignItems: 'flex-start' }}
+        className="flex-1 bg-gray-100"
+        style={{
+          overflow: 'auto',
+          WebkitOverflowScrolling: 'touch',
+          position: 'relative'
+        }}
       >
         {/* 캔버스 래퍼 - 두 캔버스를 정확히 같은 위치에 배치 */}
         <div style={{
           position: 'relative',
           display: 'inline-block',
-          maxWidth: '100%',
-          maxHeight: '100%',
-          width: 'auto',
-          height: 'auto'
+          width: '100%',
+          height: 'auto',
+          minHeight: '100%'
         }}>
           {/* 배경 캔버스 (PDF 이미지) */}
           <canvas
             ref={backgroundCanvasRef}
             style={{
               display: 'block',
-              maxWidth: '100%',
-              maxHeight: '100%',
-              width: 'auto',
+              width: '100%',
               height: 'auto',
               pointerEvents: 'none',
               imageRendering: 'auto'
